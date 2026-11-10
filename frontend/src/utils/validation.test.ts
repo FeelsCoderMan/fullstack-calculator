@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseOperand, parsePrecision, validateOperand, validatePrecision } from './validation'
+import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from './validation'
 
 describe('validateOperand', () => {
   const cases = [
@@ -44,6 +44,28 @@ describe('parseOperand', () => {
 
   it.each(cases)('$name', ({ input, want }) => {
     expect(parseOperand(input)).toBe(want)
+  })
+})
+
+describe('formatOperand', () => {
+  const cases = [
+    { name: 'integer', value: 27, want: '27' },
+    { name: 'negative decimal', value: -4.5, want: '-4.5' },
+    { name: 'float noise is kept exactly', value: 0.1 + 0.2, want: '0.30000000000000004' },
+    { name: 'large number in exponent form', value: 1e21, want: '1e+21' },
+    { name: 'largest float64', value: 1.7976931348623157e308, want: '1.7976931348623157e+308' },
+    { name: 'smallest float64', value: 5e-324, want: '5e-324' },
+  ] as const
+
+  it.each(cases)('$name', ({ value, want }) => {
+    expect(formatOperand(value)).toBe(want)
+  })
+
+  // A carried-over result must be accepted as the next operand, unchanged.
+  it.each(cases)('$name round-trips through validation', ({ value }) => {
+    const text = formatOperand(value)
+    expect(validateOperand(text)).toBeNull()
+    expect(parseOperand(text)).toBe(value)
   })
 })
 

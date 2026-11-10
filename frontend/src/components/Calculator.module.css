@@ -87,6 +87,11 @@
   background: var(--color-accent-hover);
 }
 
+.equals {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
 .primary[aria-busy='true'] {
   cursor: progress;
 }

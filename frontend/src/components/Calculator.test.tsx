@@ -35,6 +35,71 @@ describe('Calculator', () => {
     expect(calculateMock).toHaveBeenCalledWith('add', { leftOperand: 3, rightOperand: 4 }, expect.any(AbortSignal))
   })
 
+  it('continues from the result like a pocket calculator', async () => {
+    calculateMock
+      .mockResolvedValueOnce({ kind: 'success', result: 27 })
+      .mockResolvedValueOnce({ kind: 'success', result: 54 })
+    const { user, display } = setup()
+
+    await user.type(screen.getByLabelText('First number'), '15')
+    await user.type(screen.getByLabelText('Second number'), '12')
+    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await waitFor(() => expect(display).toHaveTextContent('15 + 12 =27'))
+
+    expect(screen.getByLabelText('First number')).toHaveValue('27')
+    expect(screen.getByLabelText('Second number')).toHaveValue('')
+    expect(screen.getByLabelText('Second number')).toHaveFocus()
+
+    await user.click(screen.getByRole('radio', { name: 'Multiply' }))
+    expect(display).toHaveTextContent('15 + 12 =27')
+    await user.type(screen.getByLabelText('Second number'), '2')
+    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+
+    await waitFor(() => expect(display).toHaveTextContent('27 × 2 =54'))
+    expect(calculateMock).toHaveBeenLastCalledWith(
+      'multiply',
+      { leftOperand: 27, rightOperand: 2 },
+      expect.any(AbortSignal),
+    )
+    expect(screen.getByLabelText('First number')).toHaveValue('54')
+  })
+
+  it('calculates when "=" is typed in a number field', async () => {
+    calculateMock.mockResolvedValue({ kind: 'success', result: 27 })
+    const { user, display } = setup()
+
+    await user.type(screen.getByLabelText('First number'), '15')
+    await user.type(screen.getByLabelText('Second number'), '12=')
+
+    await waitFor(() => expect(display).toHaveTextContent('15 + 12 =27'))
+    expect(calculateMock).toHaveBeenCalledWith('add', { leftOperand: 15, rightOperand: 12 }, expect.any(AbortSignal))
+  })
+
+  it('carries a square root into the single input', async () => {
+    calculateMock.mockResolvedValue({ kind: 'success', result: 3 })
+    const { user, display } = setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Square root' }))
+    await user.type(screen.getByLabelText('Number'), '9=')
+
+    await waitFor(() => expect(display).toHaveTextContent('√9 =3'))
+    expect(screen.getByLabelText('Number')).toHaveValue('3')
+    expect(screen.getByLabelText('Number')).toHaveFocus()
+  })
+
+  it('keeps the inputs when the calculation fails', async () => {
+    calculateMock.mockResolvedValue({ kind: 'failure', code: 'error.calculation.division.by.zero', requestId: 'R1' })
+    const { user, display } = setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Divide' }))
+    await user.type(screen.getByLabelText('Dividend'), '1')
+    await user.type(screen.getByLabelText('Divisor'), '0=')
+
+    await waitFor(() => expect(display).toHaveTextContent('You can’t divide by zero.'))
+    expect(screen.getByLabelText('Dividend')).toHaveValue('1')
+    expect(screen.getByLabelText('Divisor')).toHaveValue('0')
+  })
+
   it('submits with the Enter key and sends the chosen precision', async () => {
     calculateMock.mockResolvedValue({ kind: 'success', result: 0.33 })
     const { user } = setup()

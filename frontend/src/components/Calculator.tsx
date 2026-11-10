@@ -1,4 +1,4 @@
-import { useRef, type FormEvent } from 'react'
+import { useRef, type FormEvent, type KeyboardEvent } from 'react'
 import { PRECISION_MAX, PRECISION_MIN } from '../api/constants'
 import { Arity, arityOf, InputField } from '../api/operations'
 import { StatusKind, useCalculator } from '../hooks/useCalculator'
@@ -8,6 +8,9 @@ import styles from './Calculator.module.css'
 import { Field } from './Field'
 import { OperationPicker } from './OperationPicker'
 import { ResultDisplay } from './ResultDisplay'
+
+/** `KeyboardEvent.key` of the "=" key. */
+const EQUALS_KEY = '='
 
 /** Select value meaning "no rounding": `precision` is left out of the request. */
 const FULL_PRECISION = ''
@@ -30,8 +33,15 @@ export function Calculator() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const [firstInvalid] = await submit()
-    if (firstInvalid !== undefined) controls.current[firstInvalid]?.focus()
+    const next = await submit()
+    if (next !== null) controls.current[next]?.focus()
+  }
+
+  // "=" is never part of a number, so in an operand it means "calculate", like Enter.
+  function handleOperandKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== EQUALS_KEY) return
+    event.preventDefault()
+    event.currentTarget.form?.requestSubmit()
   }
 
   function handleClear() {
@@ -54,6 +64,7 @@ export function Calculator() {
             placeholder={t.form.operandPlaceholder}
             value={values[input]}
             onChange={(event) => setValue(input, event.target.value)}
+            onKeyDown={handleOperandKeyDown}
           />
         )}
       </Field>
@@ -103,9 +114,15 @@ export function Calculator() {
             <button type="button" className={cx(styles.button, styles.secondary)} onClick={handleClear}>
               {t.form.clear}
             </button>
-            {/* A stable accessible name: the label doesn't change while loading. */}
-            <button type="submit" className={cx(styles.button, styles.primary)} aria-busy={loading}>
-              {t.form.calculate}
+            {/* Shows "=" like a calculator key; named "Calculate" for assistive tech. */}
+            <button
+              type="submit"
+              className={cx(styles.button, styles.primary, styles.equals)}
+              aria-label={t.form.calculate}
+              title={t.form.calculate}
+              aria-busy={loading}
+            >
+              {t.form.equals}
             </button>
           </div>
         </div>

@@ -28,6 +28,15 @@ export function parseOperand(raw: string): number {
 }
 
 /**
+ * Writes a number back into an operand input, e.g. a result carried into the next
+ * calculation. JavaScript's shortest round-trip form (`27`, `0.30000000000000004`,
+ * `1e+21`) always passes `validateOperand` and parses back to the same number.
+ */
+export function formatOperand(value: number): string {
+  return value.toString()
+}
+
+/**
  * Validates the optional precision (decimal places). Empty means "full precision"
  * and is valid. Returns `null` when valid.
  */

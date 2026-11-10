@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { calculate, isAbortError, OutcomeKind } from '../api/client'
 import { ClientErrorCode, Operation } from '../api/constants'
-import { buildRequest, InputField, inputForField, inputsOf, type Operands } from '../api/operations'
-import { parseOperand, parsePrecision, validateOperand, validatePrecision } from '../utils/validation'
+import { Arity, arityOf, buildRequest, InputField, inputForField, inputsOf, type Operands } from '../api/operations'
+import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from '../utils/validation'
 
 /** Raw text of each input, exactly as typed. */
 export type FormValues = Record<InputField, string>
@@ -77,7 +77,9 @@ export function useCalculator() {
       cancel()
       setOperationState(next)
       setFieldErrors({})
-      setStatus(IDLE)
+      // Keep the last result visible while the next operation is chosen; only a
+      // cancelled request must leave the loading state.
+      setStatus((prev) => (prev.kind === StatusKind.Loading ? IDLE : prev))
     },
     [cancel],
   )
@@ -101,11 +103,16 @@ export function useCalculator() {
   }, [cancel])
 
   /**
-   * Validates and sends the calculation. Resolves to the inputs that are invalid
-   * (client-side or according to the API), in form order, so the caller can move
-   * focus to the first one. An empty list means there were no field errors.
+   * Validates and sends the calculation (the "=" key).
+   *
+   * On success the result carries over into the first number, like on a pocket
+   * calculator, so the next calculation continues from it: `15 + 12 = 27`, then
+   * `27 × 2 = 54`. The display keeps showing the finished calculation.
+   *
+   * Resolves to the input that should get focus next: the first invalid one after
+   * a field error, the input for the next operand after a success, or `null`.
    */
-  const submit = useCallback(async (): Promise<InputField[]> => {
+  const submit = useCallback(async (): Promise<InputField | null> => {
     const clientErrors = validateForm(operation, values)
     if (Object.keys(clientErrors).length > 0) {
       cancel()
@@ -113,7 +120,7 @@ export function useCalculator() {
       // Keep the previous result on screen (and out of the live region's way); only a
       // cancelled request must leave the loading state.
       setStatus((prev) => (prev.kind === StatusKind.Loading ? IDLE : prev))
-      return invalidInputs(operation, clientErrors)
+      return firstInvalidInput(operation, clientErrors)
     }
 
     cancel()
@@ -127,16 +134,25 @@ export function useCalculator() {
     try {
       outcome = await calculate(operation, buildRequest(operation, operands), controller.signal)
     } catch (err) {
-      if (isAbortError(err)) return []
+      if (isAbortError(err)) return null
       outcome = { kind: OutcomeKind.Failure, code: ClientErrorCode.UnexpectedResponse, requestId: null } as const
     }
-    if (controller.signal.aborted) return []
+    if (controller.signal.aborted) return null
     inFlight.current = null
 
     switch (outcome.kind) {
-      case OutcomeKind.Success:
-        setStatus({ kind: StatusKind.Success, operation, operands, result: outcome.result })
-        return []
+      case OutcomeKind.Success: {
+        const { result } = outcome
+        setStatus({ kind: StatusKind.Success, operation, operands, result })
+        // Carry the result into the first number and clear the second, ready for the
+        // next operand. Precision stays as chosen.
+        setValues((prev) => ({
+          ...prev,
+          [InputField.Left]: formatOperand(result),
+          [InputField.Right]: EMPTY_VALUES[InputField.Right],
+        }))
+        return arityOf(operation) === Arity.Binary ? InputField.Right : InputField.Left
+      }
       case OutcomeKind.FieldErrors: {
         const apiErrors: FieldErrors = {}
         let unmatched: string | null = null
@@ -151,17 +167,18 @@ export function useCalculator() {
         setStatus(
           unmatched === null ? IDLE : { kind: StatusKind.Failure, code: unmatched, requestId: outcome.requestId },
         )
-        return invalidInputs(operation, apiErrors)
+        return firstInvalidInput(operation, apiErrors)
       }
       case OutcomeKind.Failure:
         setStatus({ kind: StatusKind.Failure, code: outcome.code, requestId: outcome.requestId })
-        return []
+        return null
     }
   }, [cancel, operation, values])
 
   return { operation, values, fieldErrors, status, setOperation, setValue, reset, submit }
 }
 
-function invalidInputs(operation: Operation, errors: FieldErrors): InputField[] {
-  return inputsOf(operation).filter((input) => errors[input] !== undefined)
+/** The first input in form order that has an error, or `null`. */
+function firstInvalidInput(operation: Operation, errors: FieldErrors): InputField | null {
+  return inputsOf(operation).find((input) => errors[input] !== undefined) ?? null
 }

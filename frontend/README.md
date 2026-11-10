@@ -138,6 +138,23 @@ POST /api/v1/subtract   {"rightOperand": "x"}                                   
 | Square root | `/api/v1/sqrt`        | one number               |
 | Percentage  | `/api/v1/percentage`  | percent *of* a number    |
 
+### Continuing from a result
+
+The calculate key is **=**, and it works like a pocket calculator. After a successful
+calculation, the result carries over into the first number. The second number is cleared and
+focused, ready for the next operand:
+
+```
+15 + 12  =  27      → first number becomes 27, cursor in the second number
+pick ×, type 2, =   → 27 × 2 = 54
+```
+
+The display keeps showing the finished calculation (`15 + 12 = 27`) until the next one, even
+while you pick another operation. For square root, the result replaces the single number. A
+failed calculation leaves the inputs as they were, so you can fix them. Pressing *Enter*, or
+typing `=` in a number field, also calculates. The carried value is the exact result
+(`0.30000000000000004`, `1e+21`), so nothing is lost between steps.
+
 Every operation also takes an optional **Decimal places** setting (`precision`, 0–15). Left on
 *Full precision*, the field is not sent and the backend returns the full float64 result
 (e.g. `0.1 + 0.2 = 0.30000000000000004`).
@@ -198,7 +215,8 @@ Accessibility:
   submit, focus moves to the first invalid field.
 - The result display is an `<output aria-live="polite">`, so screen readers announce each
   result or error. It's marked `aria-busy` while a request is in flight.
-- Everything works by keyboard: *Enter* in any field calculates. Focus rings are always visible.
+- Everything works by keyboard: *Enter* in any field, or `=` in a number field, calculates.
+  Focus rings are always visible. The **=** button's accessible name is *Calculate*.
 
 ## Conventions
 
@@ -228,7 +246,7 @@ frontend/
 │   │   ├── operations.ts     # arity, inputs per operation, request building, field mapping
 │   │   └── client.ts         # calculate(): fetch + response classification
 │   ├── i18n/                 # every user-facing text, code → message lookups
-│   ├── hooks/useCalculator.ts # form state, validation, request lifecycle (abort, stale guard)
+│   ├── hooks/useCalculator.ts # form state, validation, request lifecycle, result carry-over
 │   ├── components/           # Calculator, OperationPicker, Field, ResultDisplay (+ CSS Modules)
 │   ├── utils/                # input validation, class name / aria id helpers
 │   ├── test/setup.ts         # jest-dom matchers, cleanup between tests

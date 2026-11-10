@@ -30,6 +30,7 @@ export const en = {
     precisionHint: `Rounds the result half away from zero (${PRECISION_MIN}–${PRECISION_MAX}).`,
     operandPlaceholder: 'e.g. 12.5',
     calculate: 'Calculate',
+    equals: '=',
     clear: 'Clear',
   },
   result: {
