@@ -204,7 +204,7 @@ Base path `/api/v1`, JSON bodies. The full definitions are in `backend/api/opena
 | POST   | `/api/v1/power`         | `{"a": number, "b": number}`  | `a ^ b`                |
 | POST   | `/api/v1/sqrt`          | `{"a": number}`               | `√a`                   |
 | POST   | `/api/v1/percentage`    | `{"a": number, "b": number}`  | `a` percent of `b`     |
-| GET    | `/health`              | none                          | `200 {"status":"ok"}`  |
+| GET, HEAD | `/health`           | none                          | `204`, no body         |
 | GET    | `/swagger/`             | none                          | Swagger UI             |
 | GET    | `/swagger/openapi.yaml` | none                          | raw spec               |
 
@@ -342,12 +342,26 @@ with a rule in [Decisions](#decisions) (e.g. no hardcoded strings), the Decision
 
 ### OpenAPI / Swagger
 
-- `backend/api/openapi.yaml` (OpenAPI 3.0.x) is written by hand, spec-first, and embedded with
-  `//go:embed`. Serve it at `/swagger/openapi.yaml` and a Swagger UI page at `/swagger/`.
+- `backend/api/openapi.yaml` (OpenAPI 3.0.x) is written by hand, spec-first, and embedded
+  with `//go:embed` by package `backend/api` (`api.Spec`, `api.SwaggerUI`). Served at
+  `/swagger/openapi.yaml` (`application/yaml`) and as a Swagger UI page at `/swagger/`.
+- **Workflow for a new endpoint:** first describe it in `openapi.yaml` (path, request body,
+  every response status with its schema and error codes), then implement the handler, then
+  test it. The frontend generates its types from the spec, so the spec is the deliverable
+  that unblocks frontend work.
 - Every endpoint documents its success schema and every possible error response,
-  including the error code enum.
-- A test asserts that the spec parses and that every route registered in the router (`gin.Engine.Routes()`) exists
-  in the spec (and vice versa), so the spec can't drift from the code.
+  including the error code enum. A response with no body (e.g. `/health` → `204`)
+  documents no `content`.
+- Swagger UI is loaded from a pinned `swagger-ui-dist` release on jsDelivr with Subresource
+  Integrity hashes (`api/swagger.html`). When upgrading it, recompute both `sha384` hashes
+  and cross-check them against a second CDN.
+- Spec tests (in `internal/handler`):
+  - `TestRoutesMatchSpec`: every route registered in the router (`gin.Engine.Routes()`),
+    except the docs routes, is documented in the spec, and vice versa.
+  - `assertMatchesSpec(t, req, rec)`: validates a real response against the spec (the status
+    must be documented, and the body must match its schema or be empty when none is
+    declared). Call it in every handler test row for a documented response.
+  - The spec is parsed and validated with `kin-openapi`, a test-only dependency.
 
 ### Tests
 

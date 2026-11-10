@@ -6,11 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type healthResponse struct {
-	Status HealthStatus `json:"status"`
-}
-
-// Health reports that the process is up and able to serve requests.
+// Health reports that the process is up and able to serve requests. The status
+// code is the whole answer: 204 No Content, no body (see api/openapi.yaml).
 func Health(c *gin.Context) {
-	c.JSON(http.StatusOK, healthResponse{Status: HealthStatusOK})
+	c.Status(http.StatusNoContent)
 }

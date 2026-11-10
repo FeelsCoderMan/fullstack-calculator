@@ -1,0 +1,84 @@
+package handler
+
+import (
+	"net/http"
+	"regexp"
+	"slices"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/go-cmp/cmp"
+)
+
+// docRoutes serve the documentation itself; they are not part of the API
+// contract, so they are not described in api/openapi.yaml.
+var docRoutes = []string{
+	http.MethodGet + " " + PathSwaggerUI,
+	http.MethodGet + " " + PathSwaggerSpec,
+}
+
+// ginParam matches gin path parameters (":id") so they can be compared with
+// OpenAPI templates ("{id}").
+var ginParam = regexp.MustCompile(`:([A-Za-z0-9_]+)`)
+
+// TestRoutesMatchSpec keeps the router and api/openapi.yaml in sync: every
+// registered API route must be documented, and every documented operation must
+// be registered.
+func TestRoutesMatchSpec(t *testing.T) {
+	engine, ok := NewRouter(discardLogger()).(*gin.Engine)
+	if !ok {
+		t.Fatalf("NewRouter() = %T, want *gin.Engine", NewRouter(discardLogger()))
+	}
+
+	var registered []string
+	for _, r := range engine.Routes() {
+		route := r.Method + " " + ginParam.ReplaceAllString(r.Path, "{$1}")
+		if !slices.Contains(docRoutes, route) {
+			registered = append(registered, route)
+		}
+	}
+
+	var documented []string
+	for path, item := range loadSpec(t).Paths.Map() {
+		for method := range item.Operations() {
+			documented = append(documented, method+" "+path)
+		}
+	}
+
+	slices.Sort(registered)
+	slices.Sort(documented)
+	if diff := cmp.Diff(documented, registered); diff != "" {
+		t.Errorf("router and api/openapi.yaml disagree (-documented +registered):\n%s", diff)
+	}
+}
+
+func TestRouterFallbacks(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantStatus int
+	}{
+		{
+			name:       "unknown route",
+			method:     http.MethodGet,
+			path:       "/missing",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "wrong method on a known path",
+			method:     http.MethodPost,
+			path:       "/health",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, rec := serve(t, tt.method, tt.path)
+			if rec.Code != tt.wantStatus {
+				t.Errorf("%s %s status = %d, want %d", tt.method, tt.path, rec.Code, tt.wantStatus)
+			}
+		})
+	}
+}

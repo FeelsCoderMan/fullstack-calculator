@@ -1,12 +1,12 @@
 # Air hot-reload config. DEVELOPMENT ONLY. Not used by builds, tests, or Docker.
-# Run from backend/:  make dev   (= go tool -modfile=tools.mod air)
+# Run from backend/:  set -a; . ./.env; set +a; go tool -modfile=tools.mod air
 root = "."
 tmp_dir = "tmp"
 
 [build]
   cmd = "go build -o ./tmp/server ./cmd/server"
   entrypoint = ["./tmp/server"]
-  include_ext = ["go", "yaml"]
+  include_ext = ["go", "yaml", "html"]
   exclude_dir = ["tmp", "vendor", "logs"]
   exclude_regex = ["_test\\.go$"]
   delay = 500

@@ -92,7 +92,7 @@ func TestAccessLogLevel(t *testing.T) {
 			name:       "successful health check is debug",
 			method:     http.MethodGet,
 			path:       "/health",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusNoContent,
 			wantLevel:  "DEBUG",
 		},
 		{

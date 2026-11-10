@@ -100,7 +100,7 @@ func TestRunEndToEnd(t *testing.T) {
 			name:       "health check with stdout logging only",
 			env:        map[string]string{},
 			path:       "/health",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusNoContent,
 			wantStdout: []string{
 				`"msg":"server listening"`,
 				`"msg":"server stopped"`,

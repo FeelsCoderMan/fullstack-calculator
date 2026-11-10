@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: Calculator API
+  version: 0.1.0
+  description: |
+    REST API of the full-stack calculator. This document is the single source of
+    truth for the HTTP contract: the backend is tested against it and the frontend
+    generates its TypeScript types from it.
+
+    Conventions:
+    - Success responses carry data only (or no body at all), never messages.
+    - Error responses carry a machine-readable `code`, never human-readable text.
+      The frontend maps codes to localized messages.
+
+servers:
+  - url: /
+
+tags:
+  - name: health
+    description: Liveness of the service.
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Liveness check
+      description: |
+        Succeeds while the process is able to serve requests. The status code is
+        the whole answer: there is no response body. Used by container
+        healthchecks and by the frontend to detect that the API is reachable.
+      responses:
+        "204":
+          description: The service is up. No response body.
+    head:
+      tags: [health]
+      operationId: headHealth
+      summary: Liveness check (headers only)
+      description: Same as `GET /health`, for probes that only send HEAD.
+      responses:
+        "204":
+          description: The service is up. No response body.

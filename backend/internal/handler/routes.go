@@ -26,5 +26,9 @@ func NewRouter(accessLog *slog.Logger) http.Handler {
 	r.Use(AccessLog(accessLog))
 
 	r.Match([]string{http.MethodGet, http.MethodHead}, PathHealth, Health)
+
+	// API documentation: Swagger UI and the raw spec (api/openapi.yaml).
+	r.GET(PathSwaggerUI, SwaggerUI)
+	r.GET(PathSwaggerSpec, OpenAPISpec)
 	return r
 }

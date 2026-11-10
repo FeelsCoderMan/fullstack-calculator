@@ -1,16 +1,16 @@
 package handler
 
-// URL paths served by the API.
+// URL paths served outside the versioned API.
 const (
-	PathHealth = "/health"
+	PathHealth      = "/health"
+	PathSwaggerUI   = "/swagger/"
+	PathSwaggerSpec = "/swagger/openapi.yaml"
 )
 
-// HealthStatus is the liveness state reported by the health endpoint.
-type HealthStatus string
-
-// Health statuses.
+// Content types of the documentation endpoints.
 const (
-	HealthStatusOK HealthStatus = "ok"
+	contentTypeHTML = "text/html; charset=utf-8"
+	contentTypeYAML = "application/yaml"
 )
 
 // Log messages.
