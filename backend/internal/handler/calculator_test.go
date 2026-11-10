@@ -720,6 +720,152 @@ func TestDivide(t *testing.T) {
 	}
 }
 
+// TestPower pins exponentiation, its own error (zero to a negative power), the
+// undefined and exactness cases, and the float64 limits. Body validation is
+// shared and covered in TestAdd; a few rows prove the route uses it.
+func TestPower(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
+	}{
+		{
+			name:        "integer power",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":10}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1024}`,
+		},
+		{
+			name:        "fractional exponent",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":0.5}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.4142135623730951}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":0.5,"precision":3}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.414}`,
+		},
+		{
+			name:        "negative base to an odd exponent",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-2,"rightOperand":3}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":-8}`,
+		},
+		{
+			name:        "zero to the zero is one",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0,"rightOperand":0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1}`,
+		},
+		{
+			name:        "largest power of ten is exact",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":10,"rightOperand":308}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1e308}`,
+		},
+		{
+			name:        "zero to a negative power",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0,"rightOperand":-1}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.zero.negative.power"}`,
+		},
+		{
+			name:        "negative zero to a negative even power",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-0,"rightOperand":-2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.zero.negative.power"}`,
+		},
+		{
+			name:        "base that underflows to zero, negative power",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-400,"rightOperand":-1}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.zero.negative.power"}`,
+		},
+		{
+			name:        "negative base with a fractional exponent is undefined",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-8,"rightOperand":0.5}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.undefined"}`,
+		},
+		{
+			name:        "positive overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":10,"rightOperand":309}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "negative overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-10,"rightOperand":309}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "smallest power of two in range",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":-1074}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":5e-324}`,
+		},
+		{
+			name:        "power below the lower limit underflows to zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":10,"rightOperand":-400}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "every field problem at once",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":[2],"rightOperand":1e999,"precision":1.5}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.invalid.type"},{"field":"rightOperand","code":"error.field.out.of.range"},{"field":"precision","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":10`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"leftOperand":2,"rightOperand":10}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, rec := serveJSON(t, router, PathPower, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathPower, tt.body, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
 // TestOperationsNeverReturnNegativeZero checks the raw body: a semantic JSON
 // comparison treats -0 and 0 as equal.
 func TestOperationsNeverReturnNegativeZero(t *testing.T) {
@@ -783,6 +929,21 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 			path: PathDivide,
 			body: `{"leftOperand":-1,"rightOperand":1000,"precision":2}`,
 		},
+		{
+			name: "power of negative zero to an odd exponent",
+			path: PathPower,
+			body: `{"leftOperand":-0,"rightOperand":3}`,
+		},
+		{
+			name: "power negative underflow",
+			path: PathPower,
+			body: `{"leftOperand":-10,"rightOperand":-401}`,
+		},
+		{
+			name: "power rounding a small negative result",
+			path: PathPower,
+			body: `{"leftOperand":-0.1,"rightOperand":3,"precision":2}`,
+		},
 	}
 
 	router := newTestRouter()
@@ -816,6 +977,10 @@ func (f fakeCalculator) Multiply(float64, float64, service.Precision) (float64, 
 }
 
 func (f fakeCalculator) Divide(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
+func (f fakeCalculator) Power(float64, float64, service.Precision) (float64, error) {
 	return 0, f.err
 }
 
@@ -864,6 +1029,7 @@ func TestOperationServiceErrors(t *testing.T) {
 		{name: "subtract", path: PathSubtract},
 		{name: "multiply", path: PathMultiply},
 		{name: "divide", path: PathDivide},
+		{name: "power", path: PathPower},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

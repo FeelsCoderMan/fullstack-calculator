@@ -197,6 +197,7 @@ fallback for unknown codes.
 | `error.request.body.too.large`           | 413  | body exceeds limit (1 MiB)                         |
 | `error.request.unsupported.media.type`   | 415  | `Content-Type` not `application/json`              |
 | `error.calculation.division.by.zero`     | 422  | `divide` with `rightOperand` 0 (or `-0`, or one that underflows to 0 like `1e-400`), checked before dividing |
+| `error.calculation.zero.negative.power`  | 422  | `power` with base 0 (or `-0`) and a negative exponent (`1 / 0`) |
 | `error.calculation.negative.square.root` | 422  | `sqrt` with `a < 0`                                |
 | `error.calculation.result.overflow`      | 422  | result is ±Inf                                     |
 | `error.calculation.result.undefined`     | 422  | result is NaN (e.g. `power(-8, 0.5)`)              |
@@ -216,7 +217,7 @@ shapes) are in [`backend/docs/operations.md`](backend/docs/operations.md).
 Two-operand operations take `{"leftOperand": number, "rightOperand": number, "precision"?:
 integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half away from
 zero; omitted or `null` means the full float64 result. Results are always finite and never
-`-0`. Implemented so far: `add`, `subtract`, `multiply`, `divide`. `sqrt` gets its own request shape, designed separately.
+`-0`. Implemented so far: `add`, `subtract`, `multiply`, `divide`, `power`. `sqrt` gets its own request shape, designed separately.
 
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|

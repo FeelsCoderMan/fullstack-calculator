@@ -39,6 +39,7 @@ var (
 	ErrBodyTooLarge         = &Error{Code: CodeRequestBodyTooLarge}
 	ErrUnsupportedMediaType = &Error{Code: CodeRequestUnsupportedMediaType}
 	ErrDivisionByZero       = &Error{Code: CodeDivisionByZero}
+	ErrZeroNegativePower    = &Error{Code: CodeZeroNegativePower}
 	ErrNegativeSquareRoot   = &Error{Code: CodeNegativeSquareRoot}
 	ErrResultOverflow       = &Error{Code: CodeResultOverflow}
 	ErrResultUndefined      = &Error{Code: CodeResultUndefined}

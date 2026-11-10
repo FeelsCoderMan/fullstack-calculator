@@ -22,6 +22,7 @@ func TestStatusFor(t *testing.T) {
 		{name: "body too large", code: apperror.CodeRequestBodyTooLarge, want: http.StatusRequestEntityTooLarge},
 		{name: "unsupported media type", code: apperror.CodeRequestUnsupportedMediaType, want: http.StatusUnsupportedMediaType},
 		{name: "division by zero", code: apperror.CodeDivisionByZero, want: http.StatusUnprocessableEntity},
+		{name: "zero to a negative power", code: apperror.CodeZeroNegativePower, want: http.StatusUnprocessableEntity},
 		{name: "negative square root", code: apperror.CodeNegativeSquareRoot, want: http.StatusUnprocessableEntity},
 		{name: "result overflow", code: apperror.CodeResultOverflow, want: http.StatusUnprocessableEntity},
 		{name: "result undefined", code: apperror.CodeResultUndefined, want: http.StatusUnprocessableEntity},

@@ -2,7 +2,9 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"fullstack-calculator/backend/internal/apperror"
@@ -654,6 +656,406 @@ func TestDivide(t *testing.T) {
 				t.Errorf("Divide(%g, %g, %+v) = %g, want %g", tt.a, tt.b, tt.p, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPower(t *testing.T) {
+	negZero := math.Copysign(0, -1)
+
+	tests := []struct {
+		name    string
+		a, b    float64
+		p       Precision
+		want    float64
+		wantErr error
+	}{
+		{
+			name: "integer power",
+			a:    2,
+			b:    10,
+			want: 1024,
+		},
+		{
+			name: "fractional exponent",
+			a:    2,
+			b:    0.5,
+			want: 1.4142135623730951,
+		},
+		{
+			name: "negative exponent",
+			a:    10,
+			b:    -2,
+			want: 0.01,
+		},
+		{
+			name: "negative base to an odd exponent is negative",
+			a:    -2,
+			b:    3,
+			want: -8,
+		},
+		{
+			name: "negative base to an even exponent is positive",
+			a:    -2,
+			b:    2,
+			want: 4,
+		},
+		{
+			name: "negative base to a negative odd exponent",
+			a:    -2,
+			b:    -3,
+			want: -0.125,
+		},
+		{
+			name: "float noise is kept without precision",
+			a:    1.1,
+			b:    2,
+			want: 1.2100000000000002,
+		},
+		{
+			name: "rounds to precision",
+			a:    1.1,
+			b:    2,
+			p:    RoundTo(2),
+			want: 1.21,
+		},
+		{
+			name: "rounding to negative zero gives positive zero",
+			a:    -0.1,
+			b:    3,
+			p:    RoundTo(2),
+			want: 0,
+		},
+
+		// x^0 and x^1.
+		{
+			name: "any number to the zero is one",
+			a:    5,
+			b:    0,
+			want: 1,
+		},
+		{
+			name: "zero to the zero is one",
+			a:    0,
+			b:    0,
+			want: 1,
+		},
+		{
+			name: "negative zero to the zero is one",
+			a:    negZero,
+			b:    0,
+			want: 1,
+		},
+		{
+			name: "largest float to the zero is one",
+			a:    math.MaxFloat64,
+			b:    0,
+			want: 1,
+		},
+		{
+			name: "one to a huge exponent is one",
+			a:    1,
+			b:    1e308,
+			want: 1,
+		},
+		{
+			name: "minus one to a huge even exponent is one",
+			a:    -1,
+			b:    1e300,
+			want: 1,
+		},
+		{
+			name: "minus one to the largest odd integer float is minus one",
+			a:    -1,
+			b:    1<<53 - 1,
+			want: -1,
+		},
+
+		// Zero base.
+		{
+			name: "zero to a positive power is zero",
+			a:    0,
+			b:    5,
+			want: 0,
+		},
+		{
+			name: "negative zero to an odd power is positive zero",
+			a:    negZero,
+			b:    3,
+			want: 0,
+		},
+		{
+			name:    "zero to a negative power",
+			a:       0,
+			b:       -1,
+			wantErr: apperror.ErrZeroNegativePower,
+		},
+		{
+			name:    "negative zero to a negative odd power",
+			a:       negZero,
+			b:       -1,
+			wantErr: apperror.ErrZeroNegativePower,
+		},
+		{
+			name:    "negative zero to a negative even power",
+			a:       negZero,
+			b:       -2,
+			wantErr: apperror.ErrZeroNegativePower,
+		},
+		{
+			name:    "zero to a negative fractional power",
+			a:       0,
+			b:       -0.5,
+			wantErr: apperror.ErrZeroNegativePower,
+		},
+		{
+			name:    "zero to a negative power is reported before rounding",
+			a:       0,
+			b:       -1,
+			p:       RoundTo(2),
+			wantErr: apperror.ErrZeroNegativePower,
+		},
+
+		// Negative base, fractional exponent: no real result.
+		{
+			name:    "square root of a negative base",
+			a:       -8,
+			b:       0.5,
+			wantErr: apperror.ErrResultUndefined,
+		},
+		{
+			name:    "cube root of a negative base is undefined because 1/3 isn't exact",
+			a:       -8,
+			b:       1.0 / 3,
+			wantErr: apperror.ErrResultUndefined,
+		},
+		{
+			name:    "negative base to one and a half",
+			a:       -2,
+			b:       1.5,
+			wantErr: apperror.ErrResultUndefined,
+		},
+		{
+			name:    "undefined is reported before rounding",
+			a:       -8,
+			b:       0.5,
+			p:       RoundTo(2),
+			wantErr: apperror.ErrResultUndefined,
+		},
+
+		// Integer exponents are exact (math.Pow is not).
+		{
+			name: "largest power of ten is exact",
+			a:    10,
+			b:    308,
+			want: 1e308,
+		},
+		{
+			name: "smallest normal power of ten is exact",
+			a:    10,
+			b:    -308,
+			want: 1e-308,
+		},
+		{
+			name: "integer power above 2^53 is the nearest float",
+			a:    3,
+			b:    40,
+			want: 12157665459056928801, // the exact power, rounded to float64 by the compiler
+		},
+		{
+			name: "power of the next float above one",
+			a:    1.0000000000000002,
+			b:    1 << 30,
+			want: 1.0000002384186075,
+		},
+		{
+			name: "base near one to a huge integer exponent is e",
+			a:    1.0000000000000002,
+			b:    1 << 52,
+			want: math.E,
+		},
+		{
+			name: "base just below one to a huge integer exponent is 1/e",
+			a:    1 - 1.0/(1<<53),
+			b:    1 << 53,
+			want: 0.3678794411714423,
+		},
+		{
+			name: "base near one to ten billion stays finite and exact",
+			a:    1.0000000001,
+			b:    1e10,
+			want: 2.7182820532347876,
+		},
+		{
+			name: "base just below one to a trillion stays finite and exact",
+			a:    0.9999999999,
+			b:    1e12,
+			want: 3.7200451775013044e-44,
+		},
+		{
+			name:    "NaN base is undefined, not a panic",
+			a:       math.NaN(),
+			b:       2,
+			wantErr: apperror.ErrResultUndefined,
+		},
+
+		// Upper limit: ±1.7976931348623157e308.
+		{
+			name: "largest power of two in range",
+			a:    2,
+			b:    1023,
+			want: 8.98846567431158e307,
+		},
+		{
+			name: "largest float to the first power",
+			a:    math.MaxFloat64,
+			b:    1,
+			want: math.MaxFloat64,
+		},
+		{
+			name:    "first power of two out of range overflows",
+			a:       2,
+			b:       1024,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "positive overflow",
+			a:       10,
+			b:       309,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "negative overflow",
+			a:       -10,
+			b:       309,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "largest float squared overflows",
+			a:       math.MaxFloat64,
+			b:       2,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "smallest float to minus one overflows",
+			a:       math.SmallestNonzeroFloat64,
+			b:       -1,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "tiny base to a negative power overflows",
+			a:       1e-300,
+			b:       -2,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "base near one to a large integer exponent overflows",
+			a:       1.0000001,
+			b:       1e10,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "base near one to the largest exact-path exponent overflows",
+			a:       1.0000000000000002,
+			b:       18446744073709549568, // 2^64 - 2048, the largest float64 below 2^64
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "two to an exponent beyond the exact path overflows",
+			a:       2,
+			b:       1 << 64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+
+		// Lower limit: below ~2.5e-324 a power underflows to 0 (accepted).
+		{
+			name: "smallest power of two in range",
+			a:    2,
+			b:    -1074,
+			want: math.SmallestNonzeroFloat64,
+		},
+		{
+			name: "subnormal power of ten",
+			a:    10,
+			b:    -323,
+			want: 1e-323,
+		},
+		{
+			name: "largest float to minus one is subnormal",
+			a:    math.MaxFloat64,
+			b:    -1,
+			want: 5.562684646268003e-309,
+		},
+		{
+			name: "first power of two below range underflows to zero",
+			a:    2,
+			b:    -1075,
+			want: 0,
+		},
+		{
+			name: "power of ten below range underflows to zero",
+			a:    10,
+			b:    -400,
+			want: 0,
+		},
+		{
+			name: "half to a large integer exponent underflows to zero",
+			a:    0.5,
+			b:    1e10,
+			want: 0,
+		},
+		{
+			name: "base just below one to the largest exact-path exponent underflows",
+			a:    1 - 1.0/(1<<53),
+			b:    18446744073709549568, // 2^64 - 2048
+			want: 0,
+		},
+		{
+			name: "half to an exponent beyond the exact path underflows to zero",
+			a:    0.5,
+			b:    1e20,
+			want: 0,
+		},
+		{
+			name: "negative underflow gives positive zero",
+			a:    -10,
+			b:    -401,
+			want: 0,
+		},
+	}
+
+	calc := NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calc.Power(tt.a, tt.b, tt.p)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Power(%g, %g, %+v) error = %v, want %v", tt.a, tt.b, tt.p, err, tt.wantErr)
+			}
+			if got != tt.want || math.Signbit(got) != math.Signbit(tt.want) {
+				t.Errorf("Power(%g, %g, %+v) = %g, want %g", tt.a, tt.b, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestPowerOfTenIsExact checks every power of ten float64 can hold against
+// the decimal literal strconv parses. math.Pow gets 505 of these 632 wrong,
+// which is why integer exponents go through intPow.
+func TestPowerOfTenIsExact(t *testing.T) {
+	calc := NewCalculator()
+	for n := -323; n <= 308; n++ {
+		literal := fmt.Sprintf("1e%d", n)
+		want, err := strconv.ParseFloat(literal, bitSize)
+		if err != nil {
+			t.Fatalf("ParseFloat(%q) error = %v", literal, err)
+		}
+		got, err := calc.Power(10, float64(n), Precision{})
+		if err != nil {
+			t.Fatalf("Power(10, %d) error = %v", n, err)
+		}
+		if got != want {
+			t.Errorf("Power(10, %d) = %v, want %v", n, got, want)
+		}
 	}
 }
 

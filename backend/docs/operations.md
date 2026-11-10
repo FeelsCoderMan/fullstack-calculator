@@ -1,6 +1,6 @@
 # Operation endpoints: design notes
 
-Status: **implemented for `add`, `subtract`, `multiply` and `divide`.** The normative rules are in `AGENTS.md` and
+Status: **implemented for `add`, `subtract`, `multiply`, `divide` and `power`.** The normative rules are in `AGENTS.md` and
 `api/openapi.yaml`; this file keeps the decisions and their rationale for the remaining
 operations to follow.
 
@@ -38,8 +38,9 @@ An optional `precision` field controls rounding (see section 4).
 |---|---|---|
 | Operand too large, e.g. `1e309` / `-1e309` | `strconv.ParseFloat` returns `±Inf` + `strconv.ErrRange` | 422, field code `error.field.out.of.range` |
 | Result too large, e.g. `1.7e308 + 1.7e308`, `-1.7e308 - 1.7e308` | `math.IsInf(result, 0)` (covers both signs) | 422 `error.calculation.result.overflow` |
-| Result NaN | `math.IsNaN(result)` | 422 `error.calculation.result.undefined` |
+| Result NaN, e.g. `(-8) ^ 0.5` | `math.IsNaN(result)` | 422 `error.calculation.result.undefined` |
 | Division by zero: divisor `0`, `-0`, or one that underflows to `0` (`1e-400`) | `b == 0` in `Divide`, **before** dividing | 422 `error.calculation.division.by.zero` (never reported as overflow or undefined) |
+| Zero to a negative power: base `0`/`-0` (or one that underflows to `0`), exponent `< 0` | `a == 0 && b < 0` in `Power`, **before** computing | 422 `error.calculation.zero.negative.power` (never reported as overflow) |
 | Precision loss: integers above 2⁵³, e.g. `9007199254740993` → `9007199254740992`, `94906267 * 94906267` → `…288` (exact `…289`) | none | **accepted**, not an error |
 | Underflow: magnitude below ~2.5e-324 (half the smallest positive float64, `5e-324`; values just above it round up to `5e-324`), e.g. input `1e-400` or result `1e-200 * 1e-200` (two non-zero operands) | none | **accepted, becomes `0`**, not an error |
 | Subnormal result: magnitude between ~2.2e-308 and ~5e-324, e.g. `1e-160 * 1e-160` = `1e-320` | none | **accepted**, kept with fewer significant digits |
@@ -148,6 +149,7 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 | subtract | `POST /api/v1/subtract` | `Calculator.Subtract` | `leftOperand - rightOperand` | `result.overflow` |
 | multiply | `POST /api/v1/multiply` | `Calculator.Multiply` | `leftOperand * rightOperand` | `result.overflow` |
 | divide | `POST /api/v1/divide` | `Calculator.Divide` | `leftOperand / rightOperand` | `division.by.zero`, `result.overflow` |
+| power | `POST /api/v1/power` | `Calculator.Power` | `leftOperand ^ rightOperand` | `zero.negative.power`, `result.undefined`, `result.overflow` |
 
 Notes per operation:
 
@@ -187,6 +189,34 @@ Notes per operation:
     `precision` fixes it (`3` at precision 2).
   - *Sign:* `0 / -5` and `-1e-300 / 1e300` produce `-0`, normalized to `0`. With the zero
     check, it can't produce NaN from finite operands.
+- **power:** `leftOperand` is the base, `rightOperand` the exponent.
+  - *Zero to a negative power* (`0 ^ -1`, `-0 ^ -2`, `0 ^ -0.5`, and `1e-400 ^ -1` whose
+    base underflows to `0`) is `1 / 0`: its own code, 422 `zero.negative.power` (chosen over
+    reusing `division.by.zero`, because the user didn't divide). Checked before computing,
+    because `math.Pow` returns ±Inf, which would be reported as overflow.
+  - *`x ^ 0 = 1`* for every `x`, including `0 ^ 0` and `-0 ^ 0` (IEEE 754, JavaScript's
+    `Math.pow`). `1 ^ y = 1` and `(-1) ^ (huge even y) = 1`.
+  - *No real result:* a negative base with a fractional exponent is NaN, 422
+    `result.undefined` (`(-8) ^ 0.5`, `(-2) ^ 1.5`). `(-8) ^ (1/3)` is undefined too: `1/3`
+    isn't exact in float64, so the exponent is fractional, not a cube root.
+  - *Exactness:* `math.Pow` is not correctly rounded: it gets **505 of the 632** float64
+    powers of ten wrong (`10 ^ 308` = `1.0000000000000006e308`), and for bases near 1 it
+    drifts much further (`1.0000000001 ^ 1e10`: `2.718282043475248` instead of
+    `2.7182820532347876`, wrong from the 8th digit). So every integer exponent with
+    `|b| < 2^64` uses exponentiation by squaring in a 2048-bit `big.Float`, rounded once to
+    the nearest float64 (`intPow`, at most 63 squarings, ~90µs worst case);
+    `TestPowerOfTenIsExact` checks all 632 powers of ten. At and beyond `2^64` every base
+    other than `0` and `±1` overflows or underflows (`(1+2^-52) ^ 2^64` ≈ `e^4096`), so
+    `math.Pow` is exact there. Fractional exponents use `math.Pow` and can be off in the
+    last digit. `big.Float` turns exponent overflow into ±Inf and underflow into ±0, so
+    the limits behave the same on both paths. A first version used `2^30` as the limit;
+    review found the near-1 drift, hence `2^64`.
+  - *Upper:* `2 ^ 1023 = 8.98846567431158e307` is in range; `2 ^ 1024`, `10 ^ 309`,
+    `(-10) ^ 309` (negative), `MaxFloat64 ^ 2`, `5e-324 ^ -1`, `1e-300 ^ -2` and
+    `1.0000001 ^ 1e10` overflow: 422 `result.overflow`.
+  - *Lower:* `2 ^ -1074 = 5e-324` and `10 ^ -323 = 1e-323` are kept as subnormals;
+    `2 ^ -1075`, `10 ^ -400` and `0.5 ^ 1e10` underflow to `0`, accepted.
+  - *Sign:* `-0 ^ 3` and `(-10) ^ -401` produce `-0`, normalized to `0`.
 
 ### 6.2 Adding a two-operand operation
 
@@ -208,7 +238,7 @@ Notes per operation:
 
 ### 6.3 Examples
 
-Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, `divide`, ...):
+Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, `divide`, `power`):
 
 ```
 POST /api/v1/<op>
@@ -323,6 +353,34 @@ POST /api/v1/<op>
   → 422 {"code":"error.calculation.result.overflow"}
 
 {"leftOperand": 1e-300, "rightOperand": 1e300}
+  → 200 {"result": 0}
+```
+
+`POST /api/v1/power`:
+
+```
+{"leftOperand": 2, "rightOperand": 10}
+  → 200 {"result": 1024}
+
+{"leftOperand": 2, "rightOperand": 0.5, "precision": 3}
+  → 200 {"result": 1.414}
+
+{"leftOperand": 10, "rightOperand": 308}
+  → 200 {"result": 1e+308}
+
+{"leftOperand": 0, "rightOperand": 0}
+  → 200 {"result": 1}
+
+{"leftOperand": 0, "rightOperand": -1}
+  → 422 {"code":"error.calculation.zero.negative.power"}
+
+{"leftOperand": -8, "rightOperand": 0.5}
+  → 422 {"code":"error.calculation.result.undefined"}
+
+{"leftOperand": 10, "rightOperand": 309}
+  → 422 {"code":"error.calculation.result.overflow"}
+
+{"leftOperand": 10, "rightOperand": -400}
   → 200 {"result": 0}
 ```
 

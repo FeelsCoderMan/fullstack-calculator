@@ -82,6 +82,63 @@ func (*Calculator) Divide(a, b float64, p Precision) (float64, error) {
 	return r, nil
 }
 
+// Power returns a raised to the power b, rounded to p. It fails with
+// apperror.ErrZeroNegativePower when a is 0 (or -0) and b is negative (that is
+// 1/0), checked before computing so it isn't reported as an overflow (±Inf);
+// with apperror.ErrResultUndefined for a negative a and a fractional b (no
+// real result); and with apperror.ErrResultOverflow beyond the float64 range.
+// x^0 is 1 for every x, including 0^0.
+func (*Calculator) Power(a, b float64, p Precision) (float64, error) {
+	if a == 0 && b < 0 { // also matches a == -0
+		return 0, fmt.Errorf("raise %g to %g: %w", a, b, apperror.ErrZeroNegativePower)
+	}
+	r, err := finish(pow(a, b), p)
+	if err != nil {
+		return 0, fmt.Errorf("raise %g to %g: %w", a, b, err)
+	}
+	return r, nil
+}
+
+// pow returns a^b. math.Pow is not correctly rounded: it is off in the last
+// digits for most integer exponents (10^308 is 1.0000000000000006e308) and
+// drifts further for bases near 1 (1.0000000001^1e10 is wrong from the 8th
+// digit). So every integer exponent below maxExactExponent in magnitude goes
+// through intPow. A fractional exponent, an integer one at or beyond
+// maxExactExponent (where every base other than 0 and ±1 overflows or
+// underflows), and a NaN base (which big.Float can't hold) use math.Pow.
+func pow(a, b float64) float64 {
+	if math.IsNaN(a) || b != math.Trunc(b) || math.Abs(b) >= maxExactExponent {
+		return math.Pow(a, b)
+	}
+	return intPow(a, uint64(math.Abs(b)), b < 0)
+}
+
+// intPow returns a^n, or a^-n when negative, by exponentiation by squaring in
+// a powPrecision-bit big.Float, rounded once to float64. The working precision
+// is so far beyond float64's 53 bits that the result is the nearest float64 to
+// the true power (barring a tie within ~2^-2000, which never occurs in
+// practice). big.Float turns exponent overflow into ±Inf and underflow into
+// ±0, and Float64 rounds subnormals correctly. a must be finite, and not 0
+// when negative (the caller rejects 0^negative).
+func intPow(a float64, n uint64, negative bool) float64 {
+	base := new(big.Float).SetPrec(powPrecision).SetFloat64(a)
+	r := new(big.Float).SetPrec(powPrecision).SetInt64(1)
+	for n > 0 {
+		if n&1 == 1 {
+			r.Mul(r, base)
+		}
+		n >>= 1
+		if n > 0 {
+			base.Mul(base, base)
+		}
+	}
+	if negative {
+		r.Quo(new(big.Float).SetPrec(powPrecision).SetInt64(1), r)
+	}
+	f, _ := r.Float64() // the accuracy (above or below) is irrelevant: f is the nearest float64
+	return f
+}
+
 // finish turns a raw float64 result into an API result. It runs on every
 // operation's result, in this order:
 //  1. NaN and ±Inf are errors, never results.
