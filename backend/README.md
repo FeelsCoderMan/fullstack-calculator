@@ -119,7 +119,9 @@ embeds it and serves it with Swagger UI:
 | `GET`         | `/swagger/`             | Swagger UI (HTML)                |
 | `GET`         | `/swagger/openapi.yaml` | the OpenAPI document (YAML)      |
 
-Unknown routes return `404`, and a wrong method on a known path returns `405`.
+Errors are JSON with a code only, e.g. unknown routes answer `404 {"code":"error.request.not.found"}`
+and a wrong method `405 {"code":"error.request.method.not.allowed"}`. Every response carries an
+`X-Request-ID` header (reused from the request if it's well formed, otherwise generated).
 
 ### Adding an endpoint
 
@@ -134,14 +136,29 @@ hashes, so the browser needs internet access. The API itself does not.
 
 ## Logging
 
-The server writes one JSON object per line to **stdout**, ready for Grafana Loki. Every record
-carries `service` and `logger` (`server` or `http`). Each request produces one access-log
-record with `method`, `path`, `status` and `duration_ms`. Successful `/health` checks are
-logged at `debug`, so health probes don't flood the logs.
+The full spec is in [`docs/logging.md`](docs/logging.md). The server writes one JSON object
+per line to **stdout**, ready for Grafana Loki. Every record carries `service` and `logger`
+(`server` or `http`).
+
+**Each request produces exactly one record**, `request completed`, with `method`, `path`,
+`status`, `duration_ms` and `request_id`. If the request failed, the same record also
+carries `code`, `error` (the full cause chain), and for 5xx a `stack`. Nothing is logged
+twice: handlers don't log errors, they hand them to that record.
+
+| Outcome                      | Level   |
+|------------------------------|---------|
+| 5xx, including recovered panics | `ERROR` |
+| 4xx                          | `INFO`  |
+| 2xx/3xx                      | `INFO`  |
+| successful `/health`         | `DEBUG` |
 
 ```json
-{"time":"2026-11-10T17:33:43Z","level":"INFO","msg":"server listening","service":"calculator-backend","logger":"server","addr":"[::]:8080"}
+{"level":"INFO","msg":"request completed","logger":"http","method":"GET","path":"/missing","status":404,"duration_ms":0.09,"request_id":"AQ6QWA3Y…","code":"error.request.not.found","error":"error.request.not.found"}
 ```
+
+To debug a hard-to-reproduce case, set `LOG_LEVEL=debug` in `.env`, run `make up`, then
+set it back. To find one request, search for the `X-Request-ID` value the client
+received: `{service="calculator-backend"} | json | request_id="…"`.
 
 ## Development
 
@@ -203,7 +220,9 @@ environment.
 backend/
 ├── cmd/server/          # main: server.NewApp() then app.Run(), logs any error, exits 1
 ├── api/                 # openapi.yaml (the contract) + swagger.html, embedded into the binary
+├── docs/logging.md      # logging + error handling spec
 ├── internal/
+│   ├── apperror/        # error codes, sentinels, Internal/Validation/Panic, stack capture
 │   ├── server/          # App: loads config, sets up logging, listens, graceful shutdown
 │   ├── handler/         # HTTP layer (gin): routes, handlers, access-log middleware
 │   ├── config/          # env loading: config.LoadServer, config.LoadLog

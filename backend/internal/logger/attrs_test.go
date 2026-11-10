@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bytes"
 	"errors"
 	"log/slog"
 	"testing"
@@ -72,6 +73,27 @@ func TestAttrs(t *testing.T) {
 			wantVal:  "logs",
 		},
 		{
+			name:     "request id",
+			attr:     RequestID("9f2c4e1a"),
+			wantKey:  "request_id",
+			wantKind: slog.KindString,
+			wantVal:  "9f2c4e1a",
+		},
+		{
+			name:     "error code",
+			attr:     Code("error.internal"),
+			wantKey:  "code",
+			wantKind: slog.KindString,
+			wantVal:  "error.internal",
+		},
+		{
+			name:     "empty stack is an empty attr that handlers drop",
+			attr:     Stack(nil),
+			wantKey:  "",
+			wantKind: slog.KindAny,
+			wantVal:  nil,
+		},
+		{
 			name:     "service name",
 			attr:     service(),
 			wantKey:  "service",
@@ -106,5 +128,27 @@ func TestAttrs(t *testing.T) {
 				t.Errorf("value = %#v, want %#v", got, tt.wantVal)
 			}
 		})
+	}
+}
+
+// TestStackIsJSONArray checks the one attribute whose value is a slice (not
+// comparable in TestAttrs): it must serialize as a JSON array on one line.
+func TestStackIsJSONArray(t *testing.T) {
+	var buf bytes.Buffer
+	l := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	}))
+
+	l.LogAttrs(t.Context(), slog.LevelError, "request completed",
+		Stack([]string{"service.Divide service/calc.go:42", "handler.Divide handler/calc.go:17"}))
+
+	want := `{"level":"ERROR","msg":"request completed","stack":["service.Divide service/calc.go:42","handler.Divide handler/calc.go:17"]}` + "\n"
+	if got := buf.String(); got != want {
+		t.Errorf("record = %s, want %s", got, want)
 	}
 }

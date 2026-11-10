@@ -9,8 +9,17 @@ info:
 
     Conventions:
     - Success responses carry data only (or no body at all), never messages.
-    - Error responses carry a machine-readable `code`, never human-readable text.
-      The frontend maps codes to localized messages.
+    - Error responses carry a machine-readable `code` (`ErrorResponse`), plus
+      per-field codes for validation errors (`ValidationErrorResponse`). Never
+      human-readable text: the frontend maps codes to localized messages and
+      must fall back to a generic message for codes it doesn't know.
+    - Every response carries an `X-Request-ID` header. Clients may send one
+      (1-64 characters of `[A-Za-z0-9-]`); otherwise the server generates it.
+      Quote it when reporting a problem: it identifies the request in the logs.
+    - Any request may also fail with:
+      - `404` `error.request.not.found`: unknown route
+      - `405` `error.request.method.not.allowed`: wrong method for a known path
+      - `500` `error.internal`: unexpected failure; details are in the server logs only
 
 servers:
   - url: /
@@ -32,6 +41,11 @@ paths:
       responses:
         "204":
           description: The service is up. No response body.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+        "500":
+          $ref: "#/components/responses/InternalError"
     head:
       tags: [health]
       operationId: headHealth
@@ -40,3 +54,119 @@ paths:
       responses:
         "204":
           description: The service is up. No response body.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  headers:
+    RequestID:
+      description: Identifies the request in the server logs.
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9-]{1,64}$"
+
+  responses:
+    InternalError:
+      description: Unexpected failure. The cause is only in the server logs.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: error.internal
+
+  schemas:
+    ErrorCode:
+      description: |
+        Top-level error code. Stable API contract: codes are added, never renamed.
+        - `error.request.invalid.json` (400): body is not a valid JSON object
+        - `error.validation.failed` (400): one or more fields are invalid, see `errors`
+        - `error.request.not.found` (404): unknown route
+        - `error.request.method.not.allowed` (405): wrong HTTP method
+        - `error.request.body.too.large` (413): body exceeds 1 MiB
+        - `error.request.unsupported.media.type` (415): `Content-Type` is not `application/json`
+        - `error.calculation.division.by.zero` (422): `divide` with `b == 0`
+        - `error.calculation.negative.square.root` (422): `sqrt` with `a < 0`
+        - `error.calculation.result.overflow` (422): the result is infinite
+        - `error.calculation.result.undefined` (422): the result is not a number
+        - `error.internal` (500): unexpected failure
+      type: string
+      enum:
+        - error.request.invalid.json
+        - error.validation.failed
+        - error.request.not.found
+        - error.request.method.not.allowed
+        - error.request.body.too.large
+        - error.request.unsupported.media.type
+        - error.calculation.division.by.zero
+        - error.calculation.negative.square.root
+        - error.calculation.result.overflow
+        - error.calculation.result.undefined
+        - error.internal
+
+    FieldErrorCode:
+      description: |
+        Problem with a single request field.
+        - `error.field.required`: missing or `null`
+        - `error.field.invalid.type`: not a JSON number
+        - `error.field.out.of.range`: not representable as a 64-bit float
+        - `error.field.unknown`: property not expected in the body
+      type: string
+      enum:
+        - error.field.required
+        - error.field.invalid.type
+        - error.field.out.of.range
+        - error.field.unknown
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code]
+      properties:
+        field:
+          description: JSON property name as sent by the client.
+          type: string
+          example: a
+        code:
+          $ref: "#/components/schemas/FieldErrorCode"
+
+    ErrorResponse:
+      description: Body of every error response except validation errors.
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+      example:
+        code: error.calculation.division.by.zero
+
+    ValidationErrorResponse:
+      description: |
+        Body of `error.validation.failed`. Lists every invalid field at once, in a
+        stable order.
+      type: object
+      additionalProperties: false
+      required: [code, errors]
+      properties:
+        code:
+          type: string
+          enum: [error.validation.failed]
+        errors:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/FieldError"
+      example:
+        code: error.validation.failed
+        errors:
+          - field: a
+            code: error.field.required
+          - field: b
+            code: error.field.invalid.type

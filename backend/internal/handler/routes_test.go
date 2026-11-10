@@ -58,27 +58,36 @@ func TestRouterFallbacks(t *testing.T) {
 		method     string
 		path       string
 		wantStatus int
+		wantBody   string
 	}{
 		{
 			name:       "unknown route",
 			method:     http.MethodGet,
 			path:       "/missing",
 			wantStatus: http.StatusNotFound,
+			wantBody:   `{"code":"error.request.not.found"}`,
 		},
 		{
 			name:       "wrong method on a known path",
 			method:     http.MethodPost,
 			path:       "/health",
 			wantStatus: http.StatusMethodNotAllowed,
+			wantBody:   `{"code":"error.request.method.not.allowed"}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, rec := serve(t, tt.method, tt.path)
+
 			if rec.Code != tt.wantStatus {
 				t.Errorf("%s %s status = %d, want %d", tt.method, tt.path, rec.Code, tt.wantStatus)
 			}
+			if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
+				t.Errorf("%s %s Content-Type = %q, want JSON", tt.method, tt.path, ct)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSchema(t, "ErrorResponse", rec.Body.Bytes())
 		})
 	}
 }

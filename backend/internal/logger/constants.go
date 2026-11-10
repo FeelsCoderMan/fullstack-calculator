@@ -33,6 +33,9 @@ const (
 	keyStatus     = "status"
 	keyDurationMS = "duration_ms"
 	keyDir        = "dir"
+	keyRequestID  = "request_id"
+	keyCode       = "code"
+	keyStack      = "stack"
 )
 
 // Log file settings (development-only file output).

@@ -106,6 +106,7 @@ Each package keeps its declarations in two dedicated files, the same way a domai
 │   ├── .air.toml             # optional local hot reload config (not part of the dev workflow)
 │   ├── tools.mod             # dev tool pins (golangci-lint, govulncheck, air), separate from go.mod
 │   ├── api/openapi.yaml      # contract, embedded into the binary
+│   ├── docs/logging.md       # logging + error handling spec (one record per request)
 │   ├── cmd/server/           # main: server.NewApp() + app.Run(), logs either error, exits 1
 │   └── internal/
 │       ├── server/           # App: config, wiring (DI), listen, graceful shutdown
@@ -164,8 +165,16 @@ input and `code` to a localized message. It must have a generic fallback for unk
   (e.g. `error.user.invalid.character`).
 - Codes are **API contract**: never rename one without updating the spec, frontend mapping,
   and tests together. Add new codes instead of overloading existing ones.
-- All codes are defined as constants in `backend/internal/apperror` and listed as an enum in
-  `openapi.yaml`. No string literals for codes elsewhere.
+- All codes are defined as constants in `backend/internal/apperror` (`codes.go`: `Codes()` for
+  top-level codes, `FieldCodes()` for field codes) and listed as the `ErrorCode` /
+  `FieldErrorCode` enums in `openapi.yaml`. `TestCodesMatchSpec` keeps them identical. No
+  string literals for codes elsewhere.
+- Code → HTTP status is mapped in exactly one place: `codeStatus` in
+  `internal/handler/response.go` (`TestEveryCodeHasAStatus` catches a missing entry).
+- Expected failures return an `apperror` sentinel (`ErrDivisionByZero`, …), optionally wrapped
+  with context, and are matched with `errors.Is` by code. Unexpected failures are wrapped
+  with `apperror.Internal(err)` at their origin, which records the stack. A 500 response is
+  always just `{"code":"error.internal"}`. See `backend/docs/logging.md` section 7.
 
 ### Error code catalog
 
@@ -235,8 +244,8 @@ HTTP request → handler → service → repository
   `handler.NewRouter` returns an `http.Handler`, so `internal/server` stays framework-agnostic
   and keeps owning `http.Server` (timeouts, graceful shutdown). Don't use `engine.Run()`.
   - Build the engine with `gin.New()`, never `gin.Default()`. Gin's logger and recovery
-    middleware write plain text. Access logs come from our slog middleware, and panics are
-    recovered by net/http and logged via `http.Server.ErrorLog`.
+    middleware write plain text. `RequestLogger` writes the request records and recovers
+    panics itself (`backend/docs/logging.md`).
   - `gin.SetMode(gin.ReleaseMode)`, so gin's debug output never pollutes the JSON log stream.
   - `HandleMethodNotAllowed = true`, so a wrong method returns 405, not 404.
 - Other dependencies need a reason (e.g. test-only OpenAPI validation).
@@ -308,6 +317,25 @@ with a rule in [Decisions](#decisions) (e.g. no hardcoded strings), the Decision
 
 ### Logging (backend)
 
+**Full spec: [`backend/docs/logging.md`](backend/docs/logging.md).** Read it before writing
+code that handles errors or logs. The core rules:
+
+- **One record per event, and nothing logged twice.** Each HTTP request produces exactly one
+  `request completed` record, written by the `RequestLogger` middleware (category `http`)
+  after the handler chain. It holds method, path, status, duration_ms and request_id, plus
+  `code`, `error` and `stack` when the request failed.
+- **Errors are logged once, in the request record.** `service` and `repository` return
+  errors wrapped with `%w` and never log. Handlers end every failure with `writeError(c, err)`,
+  which resolves the error through `apperror`, attaches it to the request for
+  `RequestLogger` and writes the JSON `{code}` response. Handlers never log errors themselves.
+- **Levels:** 5xx and recovered panics are always `ERROR` (with stack). 4xx is `INFO` (with
+  code and cause). Successful `/health` is `DEBUG`. Other `DEBUG` records are diagnostic
+  detail only (spec section 6), enabled with `LOG_LEVEL=debug` and a restart.
+- `RequestLogger` assigns `X-Request-ID` (reusing a well-formed incoming one) and recovers
+  panics into a 500 `error.internal`, reported in the same single record.
+
+General rules:
+
 - `log/slog` with `slog.JSONHandler` only. Never use `fmt.Print*` or the `log` package for
   application logs. One JSON object per line on **stdout**: this is what Loki ingests
   (via Promtail/Alloy or the Docker log driver). Don't log multi-line text.
@@ -328,15 +356,12 @@ with a rule in [Decisions](#decisions) (e.g. no hardcoded strings), the Decision
     Loki queries.
   - Name logger variables by role (`serverLog`, `accessLog`), never `logger`, which would
     shadow the package.
-- HTTP access logs come from middleware (category `http`): method, path, status,
-  duration_ms. Successful `/health` requests are logged at `debug` so healthchecks don't
-  flood Loki; failed ones (status >= 400) stay at `info`.
 - **File output (development only):** with `LOG_TO_FILE=true`, every record also goes to
   `LOG_DIR/<category>-<start timestamp>.log` (UTC, e.g. `logs/http-20261110T191503Z.log`), one
   file per category, alongside stdout. Files are closed on shutdown. `logs/` is gitignored.
   Never enable this in Docker/compose. Containers log to stdout only.
-- Log errors once, at the boundary that handles them (handler or `main`), not at every
-  layer that returns them. Return the error instead of logging it and returning it.
+- Outside requests, log errors once at the boundary that handles them (`main` for startup
+  and run failures). Never log an error and also return it.
 - Exception: `http.Server.ErrorLog` (bridged via `slog.NewLogLogger`) puts net/http's own
   variable text in `msg`. This is accepted: it's rare and can't be avoided without a custom handler.
 

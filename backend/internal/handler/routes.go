@@ -9,13 +9,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewRouter registers all HTTP routes on a gin engine with access logging.
+// NewRouter registers all HTTP routes on a gin engine behind RequestLogger.
 //
 // It returns an http.Handler rather than *gin.Engine so that callers (the
 // server wiring) stay framework-agnostic. The engine is built with gin.New,
 // not gin.Default: gin's own logger and recovery middleware write plain text,
-// while all logs here are JSON lines from AccessLog. A panicking handler is
-// still recovered and logged by net/http via http.Server.ErrorLog.
+// while RequestLogger writes one JSON record per request and recovers panics
+// itself (docs/logging.md).
 func NewRouter(accessLog *slog.Logger) http.Handler {
 	// Debug mode prints plain-text route listings and warnings to stdout,
 	// which would break the JSON-lines log stream.
@@ -23,7 +23,9 @@ func NewRouter(accessLog *slog.Logger) http.Handler {
 
 	r := gin.New()
 	r.HandleMethodNotAllowed = true // 405 instead of 404 for a known path with the wrong method
-	r.Use(AccessLog(accessLog))
+	r.Use(RequestLogger(accessLog))
+	r.NoRoute(notFound)
+	r.NoMethod(methodNotAllowed)
 
 	r.Match([]string{http.MethodGet, http.MethodHead}, PathHealth, Health)
 

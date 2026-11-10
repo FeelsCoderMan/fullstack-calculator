@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
+	"github.com/google/go-cmp/cmp"
 
 	"fullstack-calculator/backend/api"
 )
@@ -86,5 +88,39 @@ func assertMatchesSpec(t *testing.T, req *http.Request, rec *httptest.ResponseRe
 	}
 	if err := openapi3filter.ValidateResponse(t.Context(), input); err != nil {
 		t.Fatalf("%s %s response does not match api/openapi.yaml: %v", req.Method, req.URL.Path, err)
+	}
+}
+
+// assertMatchesSchema fails unless body is valid JSON matching the named
+// schema in api/openapi.yaml components (for responses that are not tied to a
+// documented operation, such as the 404/405 fallbacks).
+func assertMatchesSchema(t *testing.T, schema string, body []byte) {
+	t.Helper()
+	ref, ok := loadSpec(t).Components.Schemas[schema]
+	if !ok {
+		t.Fatalf("api/openapi.yaml has no schema %q", schema)
+	}
+	var v any
+	if err := json.Unmarshal(body, &v); err != nil {
+		t.Fatalf("body is not JSON: %q: %v", body, err)
+	}
+	if err := ref.Value.VisitJSON(v); err != nil {
+		t.Fatalf("body %s does not match schema %s: %v", body, schema, err)
+	}
+}
+
+// assertJSONEqual compares JSON semantically (key order and whitespace don't
+// matter; array order does).
+func assertJSONEqual(t *testing.T, want string, got []byte) {
+	t.Helper()
+	var w, g any
+	if err := json.Unmarshal([]byte(want), &w); err != nil {
+		t.Fatalf("bad want JSON %q: %v", want, err)
+	}
+	if err := json.Unmarshal(got, &g); err != nil {
+		t.Fatalf("body is not JSON: %q: %v", got, err)
+	}
+	if diff := cmp.Diff(w, g); diff != "" {
+		t.Errorf("body mismatch (-want +got):\n%s", diff)
 	}
 }

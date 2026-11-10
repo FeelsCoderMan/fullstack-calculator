@@ -38,6 +38,23 @@ func Duration(d time.Duration) slog.Attr {
 	return slog.Float64(keyDurationMS, float64(d)/float64(time.Millisecond))
 }
 
+// RequestID records the ID that correlates a request's records (and the
+// X-Request-ID response header).
+func RequestID(id string) slog.Attr { return slog.String(keyRequestID, id) }
+
+// Code records an error code sent to the client (e.g. "error.internal").
+func Code(code string) slog.Attr { return slog.String(keyCode, code) }
+
+// Stack records a stack trace as an array of frames, keeping the record on
+// one JSON line. A nil or empty stack yields an empty attribute, which slog
+// handlers drop.
+func Stack(frames []string) slog.Attr {
+	if len(frames) == 0 {
+		return slog.Attr{}
+	}
+	return slog.Any(keyStack, frames)
+}
+
 // Dir records a filesystem directory.
 func Dir(dir string) slog.Attr { return slog.String(keyDir, dir) }
 
