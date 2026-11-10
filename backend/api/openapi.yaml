@@ -229,6 +229,47 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/percentage:
+    post:
+      tags: [calculator]
+      operationId: percentage
+      summary: Percentage of a number
+      description: |
+        Returns `leftOperand` percent of `rightOperand`, that is
+        `leftOperand * rightOperand / 100`, optionally rounded to `precision`
+        decimal places (`15` percent of `19.99` is `2.9985`).
+        - Computed exactly and rounded once: no intermediate step can overflow
+          or underflow on its own (`1e307` percent of `50` is `5e306`, and
+          `100` percent of the largest float64 is that float64), and typical
+          inputs give the expected decimal (`7` percent of `100` is `7`).
+        - Only a result beyond about ±1.797e308 is 422
+          `error.calculation.result.overflow` (`200` percent of the largest
+          float64); a result below about 2.5e-324 underflows to `0`, accepted.
+        - Negative percentages and negative bases are allowed (`-20` percent
+          of `50` is `-10`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinaryOperationRequest"
+            example:
+              leftOperand: 15
+              rightOperand: 19.99
+      responses:
+        "200":
+          $ref: "#/components/responses/Result"
+        "400":
+          $ref: "#/components/responses/InvalidJSON"
+        "413":
+          $ref: "#/components/responses/BodyTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/sqrt:
     post:
       tags: [calculator]

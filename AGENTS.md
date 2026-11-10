@@ -219,7 +219,7 @@ integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half a
 zero; omitted or `null` means the full float64 result. Results are always finite and never
 `-0`. `sqrt` takes one operand instead: `{"operand": integer, "precision"?: integer 0–15}`, where
 `operand` must be a whole number (a decimal is `error.field.invalid.type`). Implemented so
-far: `add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`.
+far: all of them (`add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`, `percentage`).
 
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|

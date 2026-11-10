@@ -17,6 +17,7 @@ type Calculator interface {
 	Multiply(a, b float64, p service.Precision) (float64, error)
 	Divide(a, b float64, p service.Precision) (float64, error)
 	Power(a, b float64, p service.Precision) (float64, error)
+	Percentage(a, b float64, p service.Precision) (float64, error)
 	Sqrt(x float64, p service.Precision) (float64, error)
 }
 

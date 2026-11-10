@@ -866,6 +866,131 @@ func TestPower(t *testing.T) {
 	}
 }
 
+// TestPercentage pins "leftOperand percent of rightOperand", its exactness and
+// the float64 limits. Body validation is shared and covered in TestAdd; a few
+// rows prove the route uses it.
+func TestPercentage(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
+	}{
+		{
+			name:        "whole percent",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":10,"rightOperand":50}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":5}`,
+		},
+		{
+			name:        "swapping the operands gives the same result",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":50,"rightOperand":10}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":5}`,
+		},
+		{
+			name:        "negative percent",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-20,"rightOperand":50}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":-10}`,
+		},
+		{
+			name:        "two-decimal inputs give the expected decimal",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":15,"rightOperand":19.99}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":2.9985}`,
+		},
+		{
+			name:        "seven percent of a hundred is exactly seven",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":7,"rightOperand":100}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":7}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":15,"rightOperand":19.99,"precision":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "large percent whose product alone would overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e307,"rightOperand":50}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":5e306}`,
+		},
+		{
+			name:        "positive overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":200,"rightOperand":1.7976931348623157e308}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "negative overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1e308,"rightOperand":1e308}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "smallest float percent of a hundred is kept",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":5e-324,"rightOperand":100}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":5e-324}`,
+		},
+		{
+			name:        "result below the lower limit underflows to zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-300,"rightOperand":1e-300}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "every field problem at once",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":"10%","percent":10}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.invalid.type"},{"field":"rightOperand","code":"error.field.required"},{"field":"percent","code":"error.field.unknown"}]`,
+		},
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":10,"rightOperand":50`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"leftOperand":10,"rightOperand":50}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, rec := serveJSON(t, router, PathPercentage, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathPercentage, tt.body, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
 // TestSqrt pins the square root, its one-operand body ({"operand",
 // "precision"?}) and the whole-number rule. The body has its own decoder, so
 // unlike the two-operand operations its validation is tested here in full.
@@ -1140,6 +1265,21 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 			body: `{"leftOperand":-0.1,"rightOperand":3,"precision":2}`,
 		},
 		{
+			name: "percentage of a negative number at zero percent",
+			path: PathPercentage,
+			body: `{"leftOperand":0,"rightOperand":-5}`,
+		},
+		{
+			name: "percentage negative underflow",
+			path: PathPercentage,
+			body: `{"leftOperand":-1e-300,"rightOperand":1e-300}`,
+		},
+		{
+			name: "percentage rounding a small negative result",
+			path: PathPercentage,
+			body: `{"leftOperand":-1,"rightOperand":0.1,"precision":2}`,
+		},
+		{
 			name: "sqrt of negative zero",
 			path: PathSqrt,
 			body: `{"operand":-0}`,
@@ -1186,6 +1326,10 @@ func (f fakeCalculator) Divide(float64, float64, service.Precision) (float64, er
 }
 
 func (f fakeCalculator) Power(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
+func (f fakeCalculator) Percentage(float64, float64, service.Precision) (float64, error) {
 	return 0, f.err
 }
 
@@ -1240,6 +1384,7 @@ func TestOperationServiceErrors(t *testing.T) {
 		{name: "multiply", path: PathMultiply, body: `{"leftOperand":1,"rightOperand":2}`},
 		{name: "divide", path: PathDivide, body: `{"leftOperand":1,"rightOperand":2}`},
 		{name: "power", path: PathPower, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "percentage", path: PathPercentage, body: `{"leftOperand":1,"rightOperand":2}`},
 		{name: "sqrt", path: PathSqrt, body: `{"operand":4}`},
 	}
 	for _, tt := range tests {

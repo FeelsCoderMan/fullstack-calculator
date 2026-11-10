@@ -1038,6 +1038,210 @@ func TestPower(t *testing.T) {
 	}
 }
 
+func TestPercentage(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    float64
+		p       Precision
+		want    float64
+		wantErr error
+	}{
+		{
+			name: "whole percent",
+			a:    10,
+			b:    50,
+			want: 5,
+		},
+		{
+			name: "fractional percent",
+			a:    12.5,
+			b:    80,
+			want: 10,
+		},
+		{
+			name: "above one hundred percent",
+			a:    150,
+			b:    40,
+			want: 60,
+		},
+		{
+			name: "negative percent",
+			a:    -20,
+			b:    50,
+			want: -10,
+		},
+		{
+			name: "percent of a negative number",
+			a:    20,
+			b:    -50,
+			want: -10,
+		},
+		{
+			name: "negative percent of a negative number",
+			a:    -20,
+			b:    -50,
+			want: 10,
+		},
+		{
+			name: "hundred percent is the number itself",
+			a:    100,
+			b:    123.456,
+			want: 123.456,
+		},
+		{
+			name: "zero percent of a negative number is positive zero",
+			a:    0,
+			b:    -5,
+			want: 0,
+		},
+
+		// Exactness: both float64 orders of operations get these wrong.
+		{
+			name: "seven percent of a hundred is exactly seven",
+			a:    7,
+			b:    100,
+			want: 7, // a/100*b gives 7.000000000000001
+		},
+		{
+			name: "two-decimal inputs give the expected decimal",
+			a:    15,
+			b:    19.99,
+			want: 2.9985, // (a*b)/100 and a/100*b give 2.9984999999999995
+		},
+		{
+			name: "repeating result",
+			a:    33,
+			b:    3,
+			want: 0.99,
+		},
+		{
+			name: "inexact binary inputs show in the last digit",
+			a:    0.1,
+			b:    0.3,
+			want: 0.00030000000000000003,
+		},
+		{
+			name: "rounding removes the last-digit noise",
+			a:    0.1,
+			b:    0.3,
+			p:    RoundTo(4),
+			want: 0.0003,
+		},
+		{
+			name: "rounding to negative zero gives positive zero",
+			a:    -1,
+			b:    0.1,
+			p:    RoundTo(2),
+			want: 0,
+		},
+
+		// Upper limit: only a result beyond ±1.797e308 overflows.
+		{
+			name: "large percent whose product alone would overflow",
+			a:    1e307,
+			b:    50,
+			want: 5e306, // (a*b)/100 gives +Inf
+		},
+		{
+			name: "percent of a large number whose product alone would overflow",
+			a:    50,
+			b:    1e307,
+			want: 5e306,
+		},
+		{
+			name: "hundred percent of the largest float",
+			a:    100,
+			b:    math.MaxFloat64,
+			want: math.MaxFloat64,
+		},
+		{
+			name: "minus hundred percent of the largest float",
+			a:    -100,
+			b:    math.MaxFloat64,
+			want: -math.MaxFloat64,
+		},
+		{
+			name:    "two hundred percent of the largest float overflows",
+			a:       200,
+			b:       math.MaxFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "negative overflow",
+			a:       -200,
+			b:       math.MaxFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "huge percent of a huge number overflows",
+			a:       1e308,
+			b:       1e308,
+			wantErr: apperror.ErrResultOverflow,
+		},
+
+		// Lower limit: below ~2.5e-324 a result underflows to 0 (accepted).
+		{
+			name: "smallest float percent of a hundred is the smallest float",
+			a:    math.SmallestNonzeroFloat64,
+			b:    100,
+			want: math.SmallestNonzeroFloat64, // a/100*b gives 0
+		},
+		{
+			name: "one percent of a subnormal",
+			a:    1,
+			b:    5e-322,
+			want: math.SmallestNonzeroFloat64,
+		},
+		{
+			name: "half the smallest float underflows to zero",
+			a:    math.SmallestNonzeroFloat64,
+			b:    50,
+			want: 0,
+		},
+		{
+			name: "tiny percent of a tiny number underflows to zero",
+			a:    1e-300,
+			b:    1e-300,
+			want: 0,
+		},
+		{
+			name: "negative underflow gives positive zero",
+			a:    -1e-300,
+			b:    1e-300,
+			want: 0,
+		},
+
+		// Non-finite operands can't reach the service through the API; they
+		// fall back to float64 math instead of panicking in big.Rat.
+		{
+			name:    "NaN operand is undefined",
+			a:       math.NaN(),
+			b:       50,
+			wantErr: apperror.ErrResultUndefined,
+		},
+		{
+			name:    "infinite operand overflows",
+			a:       10,
+			b:       math.Inf(1),
+			wantErr: apperror.ErrResultOverflow,
+		},
+	}
+
+	calc := NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calc.Percentage(tt.a, tt.b, tt.p)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Percentage(%g, %g, %+v) error = %v, want %v", tt.a, tt.b, tt.p, err, tt.wantErr)
+			}
+			if got != tt.want || math.Signbit(got) != math.Signbit(tt.want) {
+				t.Errorf("Percentage(%g, %g, %+v) = %g, want %g", tt.a, tt.b, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSqrt(t *testing.T) {
 	negZero := math.Copysign(0, -1)
 

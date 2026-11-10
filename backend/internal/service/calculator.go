@@ -99,6 +99,36 @@ func (*Calculator) Power(a, b float64, p Precision) (float64, error) {
 	return r, nil
 }
 
+// Percentage returns a percent of b, a * b / 100, rounded to p. It is computed
+// exactly (percentOf), so it fails with apperror.ErrResultOverflow only when
+// the true result is beyond the float64 range.
+func (*Calculator) Percentage(a, b float64, p Precision) (float64, error) {
+	r, err := finish(percentOf(a, b), p)
+	if err != nil {
+		return 0, fmt.Errorf("%g percent of %g: %w", a, b, err)
+	}
+	return r, nil
+}
+
+// percentOf returns the float64 nearest to a * b / 100. Neither float64 order
+// of operations works: (a*b)/100 overflows when only the intermediate product
+// is too large (1e307 percent of 50), a/100*b underflows or loses digits
+// (7 percent of 100 is 7.000000000000001), and each order is off in the last
+// digit for about a quarter of two-decimal inputs (15 percent of 19.99). So the
+// product and quotient are computed exactly as a big.Rat and rounded once;
+// Float64 returns ±Inf when the result is beyond the float64 range. A
+// non-finite operand (which big.Rat can't hold) falls back to float64 math.
+func percentOf(a, b float64) float64 {
+	x, y := new(big.Rat).SetFloat64(a), new(big.Rat).SetFloat64(b)
+	if x == nil || y == nil {
+		return a * b / percent
+	}
+	r := x.Mul(x, y)
+	r.Quo(r, new(big.Rat).SetInt64(percent))
+	f, _ := r.Float64() // f is the nearest float64; whether it is exact doesn't matter
+	return f
+}
+
 // Sqrt returns the square root of x, rounded to p. It fails with
 // apperror.ErrNegativeSquareRoot when x is negative, checked before computing
 // so it isn't reported as undefined (math.Sqrt returns NaN). -0 is not

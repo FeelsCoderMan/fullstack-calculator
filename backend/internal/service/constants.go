@@ -19,6 +19,9 @@ const (
 	maxExactExponent = 1 << 64
 )
 
+// percent is the denominator of a percentage.
+const percent = 100
+
 // float64 formatting used by round.
 const (
 	// shortestFormat and shortestPrecision print the shortest decimal that

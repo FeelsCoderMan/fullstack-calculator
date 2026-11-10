@@ -1,8 +1,9 @@
 # Operation endpoints: design notes
 
-Status: **implemented for `add`, `subtract`, `multiply`, `divide`, `power` and `sqrt`.** The normative rules are in `AGENTS.md` and
-`api/openapi.yaml`; this file keeps the decisions and their rationale for the remaining
-operations to follow.
+Status: **implemented for every operation: `add`, `subtract`, `multiply`, `divide`, `power`,
+`percentage` and `sqrt`.** The normative rules are in `AGENTS.md` and
+`api/openapi.yaml`; this file keeps the decisions and their rationale for each
+operation.
 
 ## 1. Request fields
 
@@ -150,6 +151,7 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 | multiply | `POST /api/v1/multiply` | `Calculator.Multiply` | `leftOperand * rightOperand` | `result.overflow` |
 | divide | `POST /api/v1/divide` | `Calculator.Divide` | `leftOperand / rightOperand` | `division.by.zero`, `result.overflow` |
 | power | `POST /api/v1/power` | `Calculator.Power` | `leftOperand ^ rightOperand` | `zero.negative.power`, `result.undefined`, `result.overflow` |
+| percentage | `POST /api/v1/percentage` | `Calculator.Percentage` | `leftOperand` percent of `rightOperand` = `L * R / 100` | `result.overflow` |
 
 Notes per operation:
 
@@ -217,6 +219,27 @@ Notes per operation:
   - *Lower:* `2 ^ -1074 = 5e-324` and `10 ^ -323 = 1e-323` are kept as subnormals;
     `2 ^ -1075`, `10 ^ -400` and `0.5 ^ 1e10` underflow to `0`, accepted.
   - *Sign:* `-0 ^ 3` and `(-10) ^ -401` produce `-0`, normalized to `0`.
+- **percentage:** `leftOperand` percent of `rightOperand`, `L * R / 100` (the definition in
+  AGENTS.md). Commutative: `50% of 10 = 10% of 50 = 5`. Negative percentages and bases are
+  allowed (`-20% of 50 = -10`).
+  - *Exactness:* no float64 order of operations is right. `(L * R) / 100` overflows when
+    only the product is too large (`1e307% of 50` → `+Inf`, true `5e306`;
+    `100% of MaxFloat64` → `+Inf`). `L / 100 * R` underflows or adds noise
+    (`5e-324% of 100` → `0`, true `5e-324`; `7% of 100` → `7.000000000000001`). On
+    100,000 random two-decimal inputs, **each** order is off in the last digit about a
+    quarter of the time (`(L * R) / 100` 26%, `L / 100 * R` 25–26%; both at once ~9%, at
+    least one ~43%), e.g. `15% of 19.99` → `2.9984999999999995` in both, true `2.9985`. So
+    `percentOf` computes `L * R / 100` exactly as a `big.Rat` and rounds once to the
+    nearest float64 (`Rat.Float64`, which returns ±Inf beyond the range). Binary inputs
+    that aren't exact still show (`0.1% of 0.3` = `0.00030000000000000003`, the true value
+    of the binary `0.1` and `0.3`; here both float64 orders happen to print `0.0003`, by
+    a lucky rounding); `precision` fixes it. A non-finite operand (not reachable through the API) falls back to float64
+    math, because `big.Rat` can't hold it.
+  - *Upper:* only a true result beyond the range overflows: `200% of MaxFloat64`,
+    `-1e308% of 1e308` → 422 `result.overflow`.
+  - *Lower:* `5e-324% of 100 = 5e-324` is kept; `5e-324% of 50` (exactly half the
+    smallest float, a tie) and `1e-300% of 1e-300` underflow to `0`, accepted.
+  - *Sign:* `0% of -5` and `-1e-300% of 1e-300` give `0`, never `-0`.
 
 ### 6.2 Adding a two-operand operation
 
@@ -238,7 +261,7 @@ Notes per operation:
 
 ### 6.3 Examples
 
-Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, `divide`, `power`):
+Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, `divide`, `power`, `percentage`):
 
 ```
 POST /api/v1/<op>
@@ -384,6 +407,31 @@ POST /api/v1/<op>
   → 200 {"result": 0}
 ```
 
+`POST /api/v1/percentage`:
+
+```
+{"leftOperand": 10, "rightOperand": 50}
+  → 200 {"result": 5}
+
+{"leftOperand": 15, "rightOperand": 19.99}
+  → 200 {"result": 2.9985}
+
+{"leftOperand": 7, "rightOperand": 100}
+  → 200 {"result": 7}
+
+{"leftOperand": -20, "rightOperand": 50}
+  → 200 {"result": -10}
+
+{"leftOperand": 1e307, "rightOperand": 50}
+  → 200 {"result": 5e+306}
+
+{"leftOperand": 200, "rightOperand": 1.7976931348623157e308}
+  → 422 {"code":"error.calculation.result.overflow"}
+
+{"leftOperand": 5e-324, "rightOperand": 100}
+  → 200 {"result": 5e-324}
+```
+
 ### 6.4 Implementation notes
 
 `service.Precision`'s zero value means "no rounding"; `service.RoundTo(n)` sets it.
@@ -463,4 +511,4 @@ Examples, `POST /api/v1/sqrt`:
 
 ## 8. Open questions
 
-- **`percentage`:** not implemented yet. It can follow the checklist in 6.2.
+None for the operations. Every endpoint in the AGENTS.md table is implemented.
