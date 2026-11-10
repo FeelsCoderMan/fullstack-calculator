@@ -1,0 +1,147 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Desktop: "left  op  right" on one line; a one-operand operation spans the row. */
+.operands {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.binary {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.symbol {
+  /* Lines the symbol up with the inputs, below their labels. */
+  align-self: end;
+  display: grid;
+  place-items: center;
+  min-width: 2.5rem;
+  height: var(--tap-target);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* Fields with an error message grow; keep the symbol on the input line. */
+.operands:has([aria-invalid='true']) .symbol {
+  align-self: start;
+  margin-top: 1.5rem;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.precision {
+  flex: 1 1 14rem;
+  max-width: 20rem;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.button {
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.primary {
+  min-width: 9rem;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.primary[aria-busy='true'] {
+  cursor: progress;
+}
+
+.secondary {
+  border-color: var(--color-border-strong);
+  background: transparent;
+}
+
+.secondary:hover {
+  background: var(--color-surface-muted);
+}
+
+/* Mobile: 540px and below. Everything stacks, buttons go full width. */
+@media (max-width: 540px) {
+  .card {
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .form {
+    gap: var(--space-4);
+  }
+
+  .binary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .symbol,
+  .operands:has([aria-invalid='true']) .symbol {
+    align-self: center;
+    height: 1.75rem;
+    margin-top: 0;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .precision {
+    flex-basis: auto;
+    max-width: none;
+  }
+
+  /* Primary action first and largest, where the thumb is. */
+  .actions {
+    flex-direction: column-reverse;
+    margin-left: 0;
+  }
+
+  .button {
+    width: 100%;
+    min-height: 3rem;
+  }
+}

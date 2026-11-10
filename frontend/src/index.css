@@ -1,0 +1,108 @@
+/* Design tokens and base styles. Component styles live in *.module.css next to each component. */
+
+:root {
+  --color-bg: #f3f4f8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f7fb;
+  --color-text: #151924;
+  --color-text-muted: #5a6174;
+  --color-border: #d9dde8;
+  --color-border-strong: #b9bfd0;
+  --color-accent: #4a43d6;
+  --color-accent-hover: #3d36b8;
+  --color-accent-soft: #ecebff;
+  --color-on-accent: #ffffff;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fdf0ef;
+  --color-display: #1b1f2e;
+  --color-on-display: #f5f6fb;
+  --color-on-display-muted: #a9afc4;
+  --color-on-display-danger: #ff9b93;
+
+  --radius-lg: 1.25rem;
+  --radius-md: 0.75rem;
+  --radius-sm: 0.5rem;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 6%), 0 12px 32px -12px rgb(16 24 40 / 18%);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --tap-target: 2.75rem;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1118;
+    --color-surface: #181b25;
+    --color-surface-muted: #1f2330;
+    --color-text: #eceef5;
+    --color-text-muted: #a3a9bb;
+    --color-border: #2c3142;
+    --color-border-strong: #41475b;
+    --color-accent: #8b85ff;
+    --color-accent-hover: #a29dff;
+    --color-accent-soft: #262546;
+    --color-on-accent: #11121c;
+    --color-danger: #ff8a80;
+    --color-danger-soft: #3a1d1d;
+    --color-display: #0b0d13;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -12px rgb(0 0 0 / 60%);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,59 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(var(--space-6), 6vh, 4rem) var(--space-5);
+}
+
+.header,
+.main,
+.footer {
+  width: 100%;
+  max-width: 44rem;
+}
+
+.header {
+  text-align: center;
+}
+
+.title {
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.tagline {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.footer {
+  margin-top: auto;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.link {
+  color: var(--color-text-muted);
+  text-underline-offset: 0.2em;
+}
+
+.link:hover {
+  color: var(--color-accent);
+}
+
+/* Mobile: 540px and below. */
+@media (max-width: 540px) {
+  .page {
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-3);
+  }
+
+  .tagline {
+    font-size: 0.9375rem;
+  }
+}

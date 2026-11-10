@@ -1,0 +1,65 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* Shared look of the controls rendered inside a field (inputs and selects). */
+.control {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  /* 16px or more stops iOS Safari from zooming into a focused input. */
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.control:hover {
+  border-color: var(--color-text-muted);
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+/* A real outline, not a soft shadow: it must stay visible on an invalid field too,
+   which is exactly where focus lands after a failed submit. */
+.control:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-color: var(--color-accent);
+}
+
+.control[aria-invalid='true']:focus-visible {
+  outline-color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.control::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.error {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-danger);
+}
