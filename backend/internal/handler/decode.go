@@ -53,9 +53,10 @@ type unaryRequest struct {
 	precision service.Precision
 }
 
-// decodeUnaryRequest reads {"operand", "precision"?}, where operand must be a
-// whole number, and reports every invalid field at once, in a fixed order:
-// operand, precision, then unknown properties alphabetically.
+// decodeUnaryRequest reads {"operand", "precision"?}, where operand is any JSON
+// number in the float64 range (a negative one fails in the service, not here),
+// and reports every invalid field at once, in a fixed order: operand,
+// precision, then unknown properties alphabetically.
 func decodeUnaryRequest(c *gin.Context) (unaryRequest, error) {
 	fields, err := decodeObject(c)
 	if err != nil {
@@ -63,7 +64,7 @@ func decodeUnaryRequest(c *gin.Context) (unaryRequest, error) {
 	}
 	r := fieldReader{fields: fields}
 	req := unaryRequest{
-		operand:   r.integer(fieldOperand),
+		operand:   r.number(fieldOperand),
 		precision: r.precision(fieldPrecision),
 	}
 	r.rejectUnknown()
@@ -115,41 +116,22 @@ type fieldReader struct {
 // number reads a required JSON number that fits in a float64. Values below
 // the float64 range underflow to 0, which is accepted (api/openapi.yaml).
 func (r *fieldReader) number(name string) float64 {
-	f, _ := r.readNumber(name)
-	return f
-}
-
-// integer reads a required JSON number that is a whole number within the
-// float64 range. 2.0 and 1e20 count as whole numbers; 2.5 is invalid.type.
-// It may be negative.
-func (r *fieldReader) integer(name string) float64 {
-	f, ok := r.readNumber(name)
-	if ok && f != math.Trunc(f) {
-		r.fail(name, apperror.CodeFieldInvalidType)
-		return 0
-	}
-	return f
-}
-
-// readNumber is number, also reporting whether the field was valid (false
-// after it recorded a field error).
-func (r *fieldReader) readNumber(name string) (float64, bool) {
 	v, ok := r.take(name)
 	if !ok {
 		r.fail(name, apperror.CodeFieldRequired)
-		return 0, false
+		return 0
 	}
 	num, ok := v.(json.Number)
 	if !ok {
 		r.fail(name, apperror.CodeFieldInvalidType)
-		return 0, false
+		return 0
 	}
 	f, err := strconv.ParseFloat(num.String(), bitSize)
 	if err != nil { // a JSON number is valid syntax, so this is strconv.ErrRange
 		r.fail(name, apperror.CodeFieldOutOfRange)
-		return 0, false
+		return 0
 	}
-	return f, true
+	return f
 }
 
 // precision reads an optional integer number of decimal places. Absent or

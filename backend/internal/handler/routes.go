@@ -29,13 +29,18 @@ func NewRouter(accessLog *slog.Logger, calc Calculator) http.Handler {
 	r.NoMethod(methodNotAllowed)
 
 	r.Match([]string{http.MethodGet, http.MethodHead}, PathHealth, Health)
-	r.POST(PathAdd, binary(calc.Add))
-	r.POST(PathSubtract, binary(calc.Subtract))
-	r.POST(PathMultiply, binary(calc.Multiply))
-	r.POST(PathDivide, binary(calc.Divide))
-	r.POST(PathPower, binary(calc.Power))
-	r.POST(PathPercentage, binary(calc.Percentage))
-	r.POST(PathSqrt, unary(calc.Sqrt))
+
+	// Calculator operations: /api/v1/<operation>. A breaking change gets a new
+	// version group (/api/v2) next to this one instead of changing it.
+	api := r.Group(PathAPI)
+	v1 := api.Group(PathV1)
+	v1.POST(routeAdd, binary(calc.Add))
+	v1.POST(routeSubtract, binary(calc.Subtract))
+	v1.POST(routeMultiply, binary(calc.Multiply))
+	v1.POST(routeDivide, binary(calc.Divide))
+	v1.POST(routePower, binary(calc.Power))
+	v1.POST(routePercentage, binary(calc.Percentage))
+	v1.POST(routeSqrt, unary(calc.Sqrt))
 
 	// API documentation: Swagger UI and the raw spec (api/openapi.yaml).
 	r.GET(PathSwaggerUI, SwaggerUI)

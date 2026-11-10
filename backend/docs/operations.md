@@ -140,7 +140,7 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 - **Result check:** the shared service helper `finish` (section 3): no NaN/±Inf, rounding,
   no `-0`.
 - **Handler:** one generic `binary(op)` serves every operation; the route is
-  `r.POST(PathX, binary(calc.X))`.
+  `v1.POST(routeX, binary(calc.X))` in the `/api/v1` route group.
 
 ### 6.1 Implemented operations
 
@@ -250,8 +250,10 @@ Notes per operation:
    computes the raw result and passes it through `finish`, wrapping errors with context
    (`fmt.Errorf("x %g and %g: %w", a, b, err)`). Operation-specific failures (e.g.
    division by zero) return an `apperror` sentinel before `finish`.
-3. **Handler:** add `X` to the `Calculator` interface, `PathX` to `constants.go`, and
-   `r.POST(PathX, binary(calc.X))` to `routes.go`. Add `X` to `fakeCalculator`.
+3. **Handler:** add `X` to the `Calculator` interface; in `constants.go` add the relative
+   `routeX = "/x"` and the full `PathX = PathAPI + PathV1 + routeX` (tests use it); in
+   `routes.go` register `v1.POST(routeX, binary(calc.X))` in the `/api/v1` group. Add `X`
+   to `fakeCalculator`.
 4. **Tests:** a service `TestX` table (results, operand order, rounding, overflow in both
    directions, `-0`, any operation-specific error); a handler `TestX` table (results, math
    errors, a few validation rows); add rows to `TestOperationsNeverReturnNegativeZero` and
@@ -450,32 +452,32 @@ Decisions (made with the project owner):
 
 - **Request:** `UnaryOperationRequest`, `{"operand", "precision"?}`. `operand` was chosen
   over `radicand` and `value`. `precision` works as for every other operation.
-- **Domain: whole numbers.** `operand` must be an integer; `2.0` and `1e20` count, `2.25`
-  is the field code `error.field.invalid.type` (as for a non-integer `precision`). `0` is
-  allowed. The rule is request validation, enforced by the handler (`fieldReader.integer`);
-  `Calculator.Sqrt` itself accepts any float64.
+- **Domain: any number ≥ 0, whole or decimal** (`sqrt(1.5) = 1.224744871391589`). The
+  first version accepted only whole numbers (`2.25` was `error.field.invalid.type`); the
+  owner then asked for decimal operands too, so the whole-number rule and its field reader
+  were removed. `operand` is validated like any other operand (required, a JSON number,
+  within the float64 range).
 - **Negative operand:** a math error, not a field error: 422
-  `error.calculation.negative.square.root` (the code already in the catalog). Validation
-  runs first, so a negative decimal (`-2.5`) is `invalid.type`, while `-4` is
-  `negative.square.root`. Checked before computing, because `math.Sqrt(-4)` is NaN, which
-  would be reported as undefined. `-0` is not negative: its root is `0`.
+  `error.calculation.negative.square.root` (the code already in the catalog), for whole and
+  decimal operands alike (`-4`, `-2.5`, `-1e-320`). Checked before computing, because
+  `math.Sqrt(-4)` is NaN, which would be reported as undefined. `-0` is not negative: its
+  root is `0`.
 - **Validation:** its own decoder, `decodeUnaryRequest`, reports every problem at once in
   the order `operand`, `precision`, then unknown properties alphabetically. Two-operand
-  fields (`leftOperand`) are unknown here. The whole-number rule runs after parsing, so an
-  operand that underflows to `0` (`1e-400`) passes and gives `0`, while a tiny decimal that
-  float64 can hold (`1e-320`) is `invalid.type`.
+  fields (`leftOperand`) are unknown here.
 - **Adding another one-operand operation:** follow 6.2, with these differences: the spec
   uses `UnaryOperationRequest`; the service method is `X(x float64, p Precision)`; the
-  route is `r.POST(PathX, unary(calc.X))`; the `operations` row in
-  `TestOperationServiceErrors` needs a one-operand `body`; and if the operand isn't a
-  whole number, add a field reader for its rule.
+  route is `v1.POST(routeX, unary(calc.X))`; the `operations` row in
+  `TestOperationServiceErrors` needs a one-operand `body`; and if the operand needs a rule
+  beyond "a number" (e.g. whole numbers only), add a field reader for it in `decode.go`.
 
 Limits:
 
 - *Upper:* none. `math.Sqrt` is exactly rounded (IEEE 754), and the root of
   `MaxFloat64` is `1.3407807929942596e154`, so it can't overflow.
-- *Lower:* none. The root of a whole number ≥ 1 is ≥ 1; `0` gives `0`. An operand that
-  underflows on input (`1e-400`) becomes `0` and gives `0`.
+- *Lower:* none. Below 1 the root is larger than the operand: the root of the smallest
+  positive float64, `5e-324`, is `2.2227587494850775e-162`, and `sqrt(0.01) = 0.1`. `0`
+  gives `0`, and an operand that underflows on input (`1e-400`) becomes `0` and gives `0`.
 - *Precision:* integers above 2⁵³ are read inexactly (`9007199254740993` → `…992`), as
   everywhere. `94906267²` is exactly `…289`; float64 holds it as `…288`, whose root rounds
   to `94906267`.
@@ -499,10 +501,16 @@ Examples, `POST /api/v1/sqrt`:
 {"operand": -4}
   → 422 {"code":"error.calculation.negative.square.root"}
 
-{"operand": 2.25}
-  → 422 [{"field":"operand","code":"error.field.invalid.type"}]
+{"operand": 1.5}
+  → 200 {"result": 1.224744871391589}
 
-{"zeta": 1, "precision": 16, "operand": 2.5, "alpha": 1}
+{"operand": 2.25}
+  → 200 {"result": 1.5}
+
+{"operand": -2.5}
+  → 422 {"code":"error.calculation.negative.square.root"}
+
+{"zeta": 1, "precision": 16, "operand": "2.5", "alpha": 1}
   → 422 [{"field":"operand","code":"error.field.invalid.type"},
          {"field":"precision","code":"error.field.out.of.range"},
          {"field":"alpha","code":"error.field.unknown"},

@@ -7,15 +7,33 @@ const (
 	PathSwaggerSpec = "/swagger/openapi.yaml"
 )
 
-// URL paths of the versioned API (api/openapi.yaml).
+// Route groups of the API: every operation is served under PathAPI + PathV1.
 const (
-	PathAdd        = "/api/v1/add"
-	PathSubtract   = "/api/v1/subtract"
-	PathMultiply   = "/api/v1/multiply"
-	PathDivide     = "/api/v1/divide"
-	PathPower      = "/api/v1/power"
-	PathPercentage = "/api/v1/percentage"
-	PathSqrt       = "/api/v1/sqrt"
+	PathAPI = "/api"
+	PathV1  = "/v1"
+)
+
+// Operation routes, relative to the /api/v1 group (routes.go registers them
+// there).
+const (
+	routeAdd        = "/add"
+	routeSubtract   = "/subtract"
+	routeMultiply   = "/multiply"
+	routeDivide     = "/divide"
+	routePower      = "/power"
+	routePercentage = "/percentage"
+	routeSqrt       = "/sqrt"
+)
+
+// Full URL paths of the operations, as clients call them (api/openapi.yaml).
+const (
+	PathAdd        = PathAPI + PathV1 + routeAdd
+	PathSubtract   = PathAPI + PathV1 + routeSubtract
+	PathMultiply   = PathAPI + PathV1 + routeMultiply
+	PathDivide     = PathAPI + PathV1 + routeDivide
+	PathPower      = PathAPI + PathV1 + routePower
+	PathPercentage = PathAPI + PathV1 + routePercentage
+	PathSqrt       = PathAPI + PathV1 + routeSqrt
 )
 
 // Request body limits and properties.
