@@ -66,6 +66,22 @@ func (*Calculator) Multiply(a, b float64, p Precision) (float64, error) {
 	return r, nil
 }
 
+// Divide returns a / b, rounded to p. It fails with
+// apperror.ErrDivisionByZero when b is 0 or -0, checked before dividing so
+// that x/0 is never reported as an overflow (±Inf) or 0/0 as undefined (NaN).
+// It fails with apperror.ErrResultOverflow when the quotient is beyond the
+// float64 range (1 / 5e-324).
+func (*Calculator) Divide(a, b float64, p Precision) (float64, error) {
+	if b == 0 { // also matches -0
+		return 0, fmt.Errorf("divide %g by %g: %w", a, b, apperror.ErrDivisionByZero)
+	}
+	r, err := finish(a/b, p)
+	if err != nil {
+		return 0, fmt.Errorf("divide %g by %g: %w", a, b, err)
+	}
+	return r, nil
+}
+
 // finish turns a raw float64 result into an API result. It runs on every
 // operation's result, in this order:
 //  1. NaN and ±Inf are errors, never results.

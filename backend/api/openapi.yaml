@@ -147,6 +147,42 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/divide:
+    post:
+      tags: [calculator]
+      operationId: divide
+      summary: Divide two numbers
+      description: |
+        Returns `leftOperand / rightOperand`, optionally rounded to `precision`
+        decimal places. A `rightOperand` of `0` (or `-0`, or a value that
+        underflows to `0` such as `1e-400`) is
+        422 `error.calculation.division.by.zero`, checked before dividing, so
+        `0 / 0` is division by zero too. A tiny non-zero divisor can overflow
+        (`1 / 5e-324`, 422 `error.calculation.result.overflow`), and a quotient
+        can underflow to `0` (`1e-300 / 1e300`), which is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinaryOperationRequest"
+            example:
+              leftOperand: 10
+              rightOperand: 4
+      responses:
+        "200":
+          $ref: "#/components/responses/Result"
+        "400":
+          $ref: "#/components/responses/InvalidJSON"
+        "413":
+          $ref: "#/components/responses/BodyTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /health:
     get:
       tags: [health]
@@ -242,8 +278,10 @@ components:
         - one or more fields are invalid: a bare array with one entry per
           invalid field (`ValidationErrorResponse`), or
         - the fields are valid but the math is not: `ErrorResponse` with
-          `error.calculation.result.overflow` (result beyond ±1.797e308) or
-          `error.calculation.result.undefined` (result is not a number).
+          `error.calculation.result.overflow` (result beyond ±1.797e308),
+          `error.calculation.result.undefined` (result is not a number), or
+          an operation-specific code such as
+          `error.calculation.division.by.zero` (`divide` only).
       headers:
         X-Request-ID:
           $ref: "#/components/headers/RequestID"
@@ -287,7 +325,8 @@ components:
         - `error.request.method.not.allowed` (405): wrong HTTP method
         - `error.request.body.too.large` (413): body exceeds 1 MiB
         - `error.request.unsupported.media.type` (415): `Content-Type` is not `application/json`
-        - `error.calculation.division.by.zero` (422): `divide` with `b == 0`
+        - `error.calculation.division.by.zero` (422): `divide` with `rightOperand` equal to 0
+          (or `-0`, or a value that underflows to 0 such as `1e-400`)
         - `error.calculation.negative.square.root` (422): `sqrt` with `a < 0`
         - `error.calculation.result.overflow` (422): the result is infinite
         - `error.calculation.result.undefined` (422): the result is not a number

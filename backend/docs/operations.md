@@ -1,6 +1,6 @@
 # Operation endpoints: design notes
 
-Status: **implemented for `add`, `subtract` and `multiply`.** The normative rules are in `AGENTS.md` and
+Status: **implemented for `add`, `subtract`, `multiply` and `divide`.** The normative rules are in `AGENTS.md` and
 `api/openapi.yaml`; this file keeps the decisions and their rationale for the remaining
 operations to follow.
 
@@ -39,6 +39,7 @@ An optional `precision` field controls rounding (see section 4).
 | Operand too large, e.g. `1e309` / `-1e309` | `strconv.ParseFloat` returns `±Inf` + `strconv.ErrRange` | 422, field code `error.field.out.of.range` |
 | Result too large, e.g. `1.7e308 + 1.7e308`, `-1.7e308 - 1.7e308` | `math.IsInf(result, 0)` (covers both signs) | 422 `error.calculation.result.overflow` |
 | Result NaN | `math.IsNaN(result)` | 422 `error.calculation.result.undefined` |
+| Division by zero: divisor `0`, `-0`, or one that underflows to `0` (`1e-400`) | `b == 0` in `Divide`, **before** dividing | 422 `error.calculation.division.by.zero` (never reported as overflow or undefined) |
 | Precision loss: integers above 2⁵³, e.g. `9007199254740993` → `9007199254740992`, `94906267 * 94906267` → `…288` (exact `…289`) | none | **accepted**, not an error |
 | Underflow: magnitude below ~2.5e-324 (half the smallest positive float64, `5e-324`; values just above it round up to `5e-324`), e.g. input `1e-400` or result `1e-200 * 1e-200` (two non-zero operands) | none | **accepted, becomes `0`**, not an error |
 | Subnormal result: magnitude between ~2.2e-308 and ~5e-324, e.g. `1e-160 * 1e-160` = `1e-320` | none | **accepted**, kept with fewer significant digits |
@@ -146,6 +147,7 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 | add | `POST /api/v1/add` | `Calculator.Add` | `leftOperand + rightOperand` | `result.overflow` |
 | subtract | `POST /api/v1/subtract` | `Calculator.Subtract` | `leftOperand - rightOperand` | `result.overflow` |
 | multiply | `POST /api/v1/multiply` | `Calculator.Multiply` | `leftOperand * rightOperand` | `result.overflow` |
+| divide | `POST /api/v1/divide` | `Calculator.Divide` | `leftOperand / rightOperand` | `division.by.zero`, `result.overflow` |
 
 Notes per operation:
 
@@ -167,6 +169,24 @@ Notes per operation:
     (`94906267²` → `9007199515875288`, exact `…289`). Accepted.
   - *Sign:* `0 * -5` and `-1e-200 * 1e-200` produce `-0`, normalized to `0`. Can't produce
     NaN from finite operands (`0 * ±Inf` needs an infinite operand, which is rejected).
+- **divide:** the first operation with its own error. Operand order matters (`4 / 10 = 0.4`).
+  - *Division by zero:* `rightOperand` equal to `0` returns 422 `division.by.zero`. It is
+    checked **before** dividing, because IEEE division would otherwise give `1/0 = +Inf`,
+    `-1/0 = 1/-0 = -Inf` (reported wrongly as overflow) and `0/0 = NaN` (reported wrongly
+    as undefined). `-0` matches (`-0 == 0`). A divisor that underflows on input
+    (`1e-400` → `0`) is division by zero too, consistent with the underflow policy. An
+    invalid divisor (`"0"`, `null`) is a field error, not division by zero. The check runs
+    before rounding, so `precision` never hides it.
+  - *Upper:* a tiny non-zero divisor overflows (`1 / 5e-324`, `1e300 / 1e-10`,
+    `MaxFloat64 / 0.5`, either sign): 422 `result.overflow`. `1 / 1e-308 = 1e308` stays in
+    range.
+  - *Lower:* a huge divisor underflows to `0` (`1e-300 / 1e300`, `5e-324 / 2`,
+    `5e-324 / MaxFloat64`), accepted; `1e-310 / 10 = 1e-311` is kept as a subnormal.
+  - *Precision:* repeating decimals are cut at float64 precision (`1 / 3 =
+    0.3333333333333333`); float noise shows up (`0.3 / 0.1 = 2.9999999999999996`), and
+    `precision` fixes it (`3` at precision 2).
+  - *Sign:* `0 / -5` and `-1e-300 / 1e300` produce `-0`, normalized to `0`. With the zero
+    check, it can't produce NaN from finite operands.
 
 ### 6.2 Adding a two-operand operation
 
@@ -188,7 +208,7 @@ Notes per operation:
 
 ### 6.3 Examples
 
-Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, ...):
+Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, `divide`, ...):
 
 ```
 POST /api/v1/<op>
@@ -276,6 +296,34 @@ POST /api/v1/<op>
 
 {"leftOperand": 94906267, "rightOperand": 94906267}
   → 200 {"result": 9007199515875288}
+```
+
+`POST /api/v1/divide`:
+
+```
+{"leftOperand": 10, "rightOperand": 4}
+  → 200 {"result": 2.5}
+
+{"leftOperand": 1, "rightOperand": 3}
+  → 200 {"result": 0.3333333333333333}
+
+{"leftOperand": 2, "rightOperand": 3, "precision": 2}
+  → 200 {"result": 0.67}
+
+{"leftOperand": 1, "rightOperand": 0}
+  → 422 {"code":"error.calculation.division.by.zero"}
+
+{"leftOperand": 0, "rightOperand": 0}
+  → 422 {"code":"error.calculation.division.by.zero"}
+
+{"leftOperand": 1, "rightOperand": 1e-400}
+  → 422 {"code":"error.calculation.division.by.zero"}
+
+{"leftOperand": 1, "rightOperand": 5e-324}
+  → 422 {"code":"error.calculation.result.overflow"}
+
+{"leftOperand": 1e-300, "rightOperand": 1e300}
+  → 200 {"result": 0}
 ```
 
 ### 6.4 Implementation notes

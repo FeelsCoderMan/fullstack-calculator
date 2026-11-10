@@ -553,6 +553,173 @@ func TestMultiply(t *testing.T) {
 	}
 }
 
+// TestDivide pins the division itself, division by zero and the float64
+// limits. Body validation is shared and covered in TestAdd; a few rows prove
+// the route uses it.
+func TestDivide(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
+	}{
+		{
+			name:        "exact quotient",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":10,"rightOperand":4}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":2.5}`,
+		},
+		{
+			name:        "operand order matters",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":4,"rightOperand":10}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.4}`,
+		},
+		{
+			name:        "repeating decimal",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":3}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.3333333333333333}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":3,"precision":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.67}`,
+		},
+		{
+			name:        "zero dividend",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0,"rightOperand":7}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "division by zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":0}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.division.by.zero"}`,
+		},
+		{
+			name:        "division by negative zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1,"rightOperand":-0}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.division.by.zero"}`,
+		},
+		{
+			name:        "zero by zero is division by zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0,"rightOperand":0.0}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.division.by.zero"}`,
+		},
+		{
+			name:        "divisor that underflows to zero is division by zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":1e-400}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.division.by.zero"}`,
+		},
+		{
+			name:        "divisor just below the input cut-off reads as zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2.4e-324}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.division.by.zero"}`,
+		},
+		{
+			name:        "divisor just above the input cut-off reads as the smallest float and overflows",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2.5e-324}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "division by zero with precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":0,"precision":2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.division.by.zero"}`,
+		},
+		{
+			name:        "invalid divisor is a field error, not division by zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":"0"}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"rightOperand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "positive overflow from a tiny divisor",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":5e-324}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "negative overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1e300,"rightOperand":1e-10}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "subnormal quotient is kept",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-310,"rightOperand":10}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1e-311}`,
+		},
+		{
+			name:        "quotient below the lower limit underflows to zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-300,"rightOperand":1e300}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "every field problem at once",
+			contentType: binding.MIMEJSON,
+			body:        `{"rightOperand":null,"precision":"2"}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.required"},{"field":"precision","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":0`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"leftOperand":10,"rightOperand":4}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, rec := serveJSON(t, router, PathDivide, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathDivide, tt.body, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
 // TestOperationsNeverReturnNegativeZero checks the raw body: a semantic JSON
 // comparison treats -0 and 0 as equal.
 func TestOperationsNeverReturnNegativeZero(t *testing.T) {
@@ -601,6 +768,21 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 			path: PathMultiply,
 			body: `{"leftOperand":-0.01,"rightOperand":0.1,"precision":2}`,
 		},
+		{
+			name: "divide zero by a negative number",
+			path: PathDivide,
+			body: `{"leftOperand":0,"rightOperand":-5}`,
+		},
+		{
+			name: "divide negative underflow",
+			path: PathDivide,
+			body: `{"leftOperand":-1e-300,"rightOperand":1e300}`,
+		},
+		{
+			name: "divide rounding a small negative quotient",
+			path: PathDivide,
+			body: `{"leftOperand":-1,"rightOperand":1000,"precision":2}`,
+		},
 	}
 
 	router := newTestRouter()
@@ -630,6 +812,10 @@ func (f fakeCalculator) Subtract(float64, float64, service.Precision) (float64, 
 }
 
 func (f fakeCalculator) Multiply(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
+func (f fakeCalculator) Divide(float64, float64, service.Precision) (float64, error) {
 	return 0, f.err
 }
 
@@ -677,6 +863,7 @@ func TestOperationServiceErrors(t *testing.T) {
 		{name: "add", path: PathAdd},
 		{name: "subtract", path: PathSubtract},
 		{name: "multiply", path: PathMultiply},
+		{name: "divide", path: PathDivide},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

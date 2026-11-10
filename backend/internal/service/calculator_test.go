@@ -428,8 +428,238 @@ func TestMultiply(t *testing.T) {
 	}
 }
 
+func TestDivide(t *testing.T) {
+	negZero := math.Copysign(0, -1)
+
+	tests := []struct {
+		name    string
+		a, b    float64
+		p       Precision
+		want    float64
+		wantErr error
+	}{
+		{
+			name: "exact quotient",
+			a:    10,
+			b:    4,
+			want: 2.5,
+		},
+		{
+			name: "operand order matters",
+			a:    4,
+			b:    10,
+			want: 0.4,
+		},
+		{
+			name: "negative divided by positive is negative",
+			a:    -7,
+			b:    2,
+			want: -3.5,
+		},
+		{
+			name: "two negatives make a positive",
+			a:    -9,
+			b:    -3,
+			want: 3,
+		},
+		{
+			name: "repeating decimal is cut at float64 precision",
+			a:    1,
+			b:    3,
+			want: 0.3333333333333333,
+		},
+		{
+			name: "rounds a repeating decimal half away from zero",
+			a:    2,
+			b:    3,
+			p:    RoundTo(2),
+			want: 0.67,
+		},
+		{
+			name: "float noise is kept without precision",
+			a:    0.3,
+			b:    0.1,
+			want: 2.9999999999999996,
+		},
+		{
+			name: "rounding removes float noise",
+			a:    0.3,
+			b:    0.1,
+			p:    RoundTo(2),
+			want: 3,
+		},
+		{
+			name: "zero divided by a number is zero",
+			a:    0,
+			b:    7,
+			want: 0,
+		},
+		{
+			name: "zero divided by a negative is positive zero",
+			a:    0,
+			b:    -5,
+			want: 0,
+		},
+		{
+			name: "rounding to negative zero gives positive zero",
+			a:    -1,
+			b:    1000,
+			p:    RoundTo(2),
+			want: 0,
+		},
+
+		// Division by zero: checked before dividing, whatever the dividend.
+		{
+			name:    "positive by zero",
+			a:       1,
+			b:       0,
+			wantErr: apperror.ErrDivisionByZero,
+		},
+		{
+			name:    "negative by zero",
+			a:       -1,
+			b:       0,
+			wantErr: apperror.ErrDivisionByZero,
+		},
+		{
+			name:    "by negative zero",
+			a:       1,
+			b:       negZero,
+			wantErr: apperror.ErrDivisionByZero,
+		},
+		{
+			name:    "zero by zero is division by zero, not undefined",
+			a:       0,
+			b:       0,
+			wantErr: apperror.ErrDivisionByZero,
+		},
+		{
+			name:    "largest float by zero is division by zero, not overflow",
+			a:       math.MaxFloat64,
+			b:       0,
+			wantErr: apperror.ErrDivisionByZero,
+		},
+		{
+			name:    "division by zero is reported before rounding",
+			a:       1,
+			b:       0,
+			p:       RoundTo(2),
+			wantErr: apperror.ErrDivisionByZero,
+		},
+
+		// Upper limit: ±1.7976931348623157e308.
+		{
+			name: "largest float by one",
+			a:    math.MaxFloat64,
+			b:    1,
+			want: math.MaxFloat64,
+		},
+		{
+			name: "largest float by itself is one",
+			a:    math.MaxFloat64,
+			b:    math.MaxFloat64,
+			want: 1,
+		},
+		{
+			name: "largest float by the most negative float is minus one",
+			a:    math.MaxFloat64,
+			b:    -math.MaxFloat64,
+			want: -1,
+		},
+		{
+			name: "one by the smallest normal power of ten stays in range",
+			a:    1,
+			b:    1e-308,
+			want: 1e308,
+		},
+		{
+			name:    "largest float by one half overflows",
+			a:       math.MaxFloat64,
+			b:       0.5,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "negative overflow",
+			a:       -math.MaxFloat64,
+			b:       0.5,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "one by the smallest positive float overflows",
+			a:       1,
+			b:       math.SmallestNonzeroFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "one by the tiny negative float overflows negatively",
+			a:       1,
+			b:       -math.SmallestNonzeroFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "large by tiny overflows",
+			a:       1e300,
+			b:       1e-10,
+			wantErr: apperror.ErrResultOverflow,
+		},
+
+		// Lower limit: below ~2.5e-324 a quotient underflows to 0 (accepted).
+		{
+			name: "subnormal quotient is kept",
+			a:    1e-310,
+			b:    10,
+			want: 1e-311,
+		},
+		{
+			name: "smallest float by 1.5 rounds up to the smallest float",
+			a:    math.SmallestNonzeroFloat64,
+			b:    1.5,
+			want: math.SmallestNonzeroFloat64,
+		},
+		{
+			name: "smallest float halved underflows to zero",
+			a:    math.SmallestNonzeroFloat64,
+			b:    2,
+			want: 0,
+		},
+		{
+			name: "smallest float by largest float underflows to zero",
+			a:    math.SmallestNonzeroFloat64,
+			b:    math.MaxFloat64,
+			want: 0,
+		},
+		{
+			name: "tiny by huge underflows to zero",
+			a:    1e-300,
+			b:    1e300,
+			want: 0,
+		},
+		{
+			name: "negative underflow gives positive zero",
+			a:    -1e-300,
+			b:    1e300,
+			want: 0,
+		},
+	}
+
+	calc := NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calc.Divide(tt.a, tt.b, tt.p)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Divide(%g, %g, %+v) error = %v, want %v", tt.a, tt.b, tt.p, err, tt.wantErr)
+			}
+			if got != tt.want || math.Signbit(got) != math.Signbit(tt.want) {
+				t.Errorf("Divide(%g, %g, %+v) = %g, want %g", tt.a, tt.b, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestFinish covers the result checks every operation shares, including NaN,
-// which no operation so far can produce from finite operands.
+// which no operation so far can produce from finite operands (Divide rejects
+// 0/0 as division by zero before dividing).
 func TestFinish(t *testing.T) {
 	tests := []struct {
 		name    string
