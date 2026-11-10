@@ -140,7 +140,7 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 - **Result check:** the shared service helper `finish` (section 3): no NaN/±Inf, rounding,
   no `-0`.
 - **Handler:** one generic `binary(op)` serves every operation; the route is
-  `r.POST(PathX, binary(calc.X))`.
+  `v1.POST(routeX, binary(calc.X))` in the `/api/v1` route group.
 
 ### 6.1 Implemented operations
 
@@ -250,8 +250,10 @@ Notes per operation:
    computes the raw result and passes it through `finish`, wrapping errors with context
    (`fmt.Errorf("x %g and %g: %w", a, b, err)`). Operation-specific failures (e.g.
    division by zero) return an `apperror` sentinel before `finish`.
-3. **Handler:** add `X` to the `Calculator` interface, `PathX` to `constants.go`, and
-   `r.POST(PathX, binary(calc.X))` to `routes.go`. Add `X` to `fakeCalculator`.
+3. **Handler:** add `X` to the `Calculator` interface; in `constants.go` add the relative
+   `routeX = "/x"` and the full `PathX = PathAPI + PathV1 + routeX` (tests use it); in
+   `routes.go` register `v1.POST(routeX, binary(calc.X))` in the `/api/v1` group. Add `X`
+   to `fakeCalculator`.
 4. **Tests:** a service `TestX` table (results, operand order, rounding, overflow in both
    directions, `-0`, any operation-specific error); a handler `TestX` table (results, math
    errors, a few validation rows); add rows to `TestOperationsNeverReturnNegativeZero` and
@@ -466,7 +468,7 @@ Decisions (made with the project owner):
   float64 can hold (`1e-320`) is `invalid.type`.
 - **Adding another one-operand operation:** follow 6.2, with these differences: the spec
   uses `UnaryOperationRequest`; the service method is `X(x float64, p Precision)`; the
-  route is `r.POST(PathX, unary(calc.X))`; the `operations` row in
+  route is `v1.POST(routeX, unary(calc.X))`; the `operations` row in
   `TestOperationServiceErrors` needs a one-operand `body`; and if the operand isn't a
   whole number, add a field reader for its rule.
 
