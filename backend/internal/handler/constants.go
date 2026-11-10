@@ -9,7 +9,8 @@ const (
 
 // URL paths of the versioned API (api/openapi.yaml).
 const (
-	PathAdd = "/api/v1/add"
+	PathAdd      = "/api/v1/add"
+	PathSubtract = "/api/v1/subtract"
 )
 
 // Request body limits and properties.

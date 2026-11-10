@@ -13,6 +13,7 @@ import (
 // produce.
 type Calculator interface {
 	Add(a, b float64, p service.Precision) (float64, error)
+	Subtract(a, b float64, p service.Precision) (float64, error)
 }
 
 // binaryOperation is one two-operand Calculator method, e.g. calc.Add.

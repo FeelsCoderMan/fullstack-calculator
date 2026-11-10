@@ -331,34 +331,152 @@ func TestAdd(t *testing.T) {
 	}
 }
 
-// TestAddNeverReturnsNegativeZero checks the raw body: a semantic JSON
-// comparison treats -0 and 0 as equal.
-func TestAddNeverReturnsNegativeZero(t *testing.T) {
+// TestSubtract pins the subtraction itself. Body validation is shared with
+// every two-operand operation and covered in TestAdd; the few rows here prove
+// the route uses it.
+func TestSubtract(t *testing.T) {
 	tests := []struct {
-		name string
-		body string
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
 	}{
 		{
-			name: "negative zero operands",
-			body: `{"leftOperand":-0,"rightOperand":-0}`,
+			name:        "subtracts integers",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":5,"rightOperand":3}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":2}`,
 		},
 		{
-			name: "negative underflow",
-			body: `{"leftOperand":-1e-400,"rightOperand":-0}`,
+			name:        "operand order matters",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":3,"rightOperand":5}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":-2}`,
 		},
 		{
-			name: "rounding a small negative number",
-			body: `{"leftOperand":-0.001,"rightOperand":0,"precision":2}`,
+			name:        "subtracting a negative adds",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1.5,"rightOperand":-2.25}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.75}`,
+		},
+		{
+			name:        "keeps float noise without precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0.3,"rightOperand":0.1}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.19999999999999998}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0.3,"rightOperand":0.1,"precision":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.2}`,
+		},
+		{
+			name:        "number minus itself is zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.5,"rightOperand":1.5}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "positive overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.7e308,"rightOperand":-1.7e308}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "negative overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1.7e308,"rightOperand":1.7e308}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "every field problem at once",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":"5","precision":16}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.invalid.type"},{"field":"rightOperand","code":"error.field.required"},{"field":"precision","code":"error.field.out.of.range"}]`,
+		},
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":5`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"leftOperand":5,"rightOperand":3}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
 		},
 	}
 
 	router := newTestRouter()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, rec := serveJSON(t, router, PathAdd, binding.MIMEJSON, tt.body)
+			req, rec := serveJSON(t, router, PathSubtract, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathSubtract, tt.body, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
+// TestOperationsNeverReturnNegativeZero checks the raw body: a semantic JSON
+// comparison treats -0 and 0 as equal.
+func TestOperationsNeverReturnNegativeZero(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		body string
+	}{
+		{
+			name: "add negative zero operands",
+			path: PathAdd,
+			body: `{"leftOperand":-0,"rightOperand":-0}`,
+		},
+		{
+			name: "add negative underflow",
+			path: PathAdd,
+			body: `{"leftOperand":-1e-400,"rightOperand":-0}`,
+		},
+		{
+			name: "add rounding a small negative number",
+			path: PathAdd,
+			body: `{"leftOperand":-0.001,"rightOperand":0,"precision":2}`,
+		},
+		{
+			name: "subtract zero from negative zero",
+			path: PathSubtract,
+			body: `{"leftOperand":-0,"rightOperand":0}`,
+		},
+		{
+			name: "subtract rounding a small negative number",
+			path: PathSubtract,
+			body: `{"leftOperand":0,"rightOperand":0.001,"precision":2}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, rec := serveJSON(t, router, tt.path, binding.MIMEJSON, tt.body)
 
 			if got, want := rec.Body.String(), `{"result":0}`; got != want {
-				t.Errorf("POST %s %s body = %#v, want %#v", PathAdd, tt.body, got, want)
+				t.Errorf("POST %s %s body = %#v, want %#v", tt.path, tt.body, got, want)
 			}
 		})
 	}
@@ -374,9 +492,15 @@ func (f fakeCalculator) Add(float64, float64, service.Precision) (float64, error
 	return 0, f.err
 }
 
+func (f fakeCalculator) Subtract(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
 var errDiskOnFire = errors.New("disk on fire")
 
-func TestAddServiceErrors(t *testing.T) {
+// TestOperationServiceErrors checks how every operation route answers the
+// errors its Calculator method returns.
+func TestOperationServiceErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		err        error
@@ -385,7 +509,7 @@ func TestAddServiceErrors(t *testing.T) {
 	}{
 		{
 			name:       "wrapped expected failure keeps its code",
-			err:        fmt.Errorf("add: %w", apperror.ErrResultUndefined),
+			err:        fmt.Errorf("operation: %w", apperror.ErrResultUndefined),
 			wantStatus: http.StatusUnprocessableEntity,
 			wantBody:   `{"code":"error.calculation.result.undefined"}`,
 		},
@@ -409,16 +533,27 @@ func TestAddServiceErrors(t *testing.T) {
 		},
 	}
 
+	operations := []struct {
+		name string
+		path string
+	}{
+		{name: "add", path: PathAdd},
+		{name: "subtract", path: PathSubtract},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := NewRouter(discardLogger(), fakeCalculator{err: tt.err})
-			req, rec := serveJSON(t, router, PathAdd, binding.MIMEJSON, `{"leftOperand":1,"rightOperand":2}`)
+			for _, op := range operations {
+				t.Run(op.name, func(t *testing.T) {
+					req, rec := serveJSON(t, router, op.path, binding.MIMEJSON, `{"leftOperand":1,"rightOperand":2}`)
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s with Add error %v: status = %d, want %d", PathAdd, tt.err, rec.Code, tt.wantStatus)
+					if rec.Code != tt.wantStatus {
+						t.Errorf("POST %s with calculator error %v: status = %d, want %d", op.path, tt.err, rec.Code, tt.wantStatus)
+					}
+					assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+					assertMatchesSpec(t, req, rec)
+				})
 			}
-			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
-			assertMatchesSpec(t, req, rec)
 		})
 	}
 }

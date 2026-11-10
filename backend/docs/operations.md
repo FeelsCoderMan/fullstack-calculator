@@ -1,6 +1,6 @@
 # Operation endpoints: design notes
 
-Status: **implemented for `add`.** The normative rules are in `AGENTS.md` and
+Status: **implemented for `add` and `subtract`.** The normative rules are in `AGENTS.md` and
 `api/openapi.yaml`; this file keeps the decisions and their rationale for the remaining
 operations to follow.
 
@@ -37,11 +37,11 @@ An optional `precision` field controls rounding (see section 4).
 | Situation | Detection | Response |
 |---|---|---|
 | Operand too large, e.g. `1e309` / `-1e309` | `strconv.ParseFloat` returns `±Inf` + `strconv.ErrRange` | 422, field code `error.field.out.of.range` |
-| Result too large, e.g. `1.7e308 + 1.7e308` / `-1.7e308 + -1.7e308` | `math.IsInf(result, 0)` (covers both signs) | 422 `error.calculation.result.overflow` |
+| Result too large, e.g. `1.7e308 + 1.7e308`, `-1.7e308 - 1.7e308` | `math.IsInf(result, 0)` (covers both signs) | 422 `error.calculation.result.overflow` |
 | Result NaN | `math.IsNaN(result)` | 422 `error.calculation.result.undefined` |
 | Precision loss: integers above 2⁵³, e.g. `9007199254740993` → `9007199254740992` | none | **accepted**, not an error |
 | Underflow: magnitude below ~5e-324, e.g. input `1e-400` or result `1e-200 * 1e-200` | none | **accepted, becomes `0`**, not an error |
-| Negative zero, e.g. `0 * -5`, `0 / -5`, `-0 + -0`, input `-0`, `-1e-200 * 1e-200` | `result == 0` | **normalized to `0`**: the API never returns `-0` |
+| Negative zero, e.g. `0 * -5`, `0 / -5`, `-0 + -0`, `-0 - 0`, input `-0`, `-1e-200 * 1e-200` | `result == 0` | **normalized to `0`**: the API never returns `-0` |
 
 The precision-loss and underflow limits are documented in the API description in
 `openapi.yaml` (and the README), so clients know about them.
@@ -123,12 +123,60 @@ What the implementation has to handle:
   for everything else. A validation error with no fields is a bug and is answered as a
   500 `error.internal`, so the array never breaks `minItems: 1`.
 
-## 6. Example: `POST /api/v1/add`
+## 6. Two-operand operations
+
+Every two-operand operation shares the same contract; only the arithmetic differs.
+
+- **Request:** `BinaryOperationRequest`, `{"leftOperand", "rightOperand", "precision"?}`.
+- **Responses:** 200 `{"result"}`, 400 invalid JSON, 413, 415, 422 (field-error array or a
+  math `{code}`), 500. Same response `$ref`s in the spec for every operation.
+- **Validation:** one shared handler, `decodeBinaryRequest` (sections 4 and 5). It is fully
+  tested once, in `TestAdd`; each other operation's HTTP test keeps a few rows that prove its
+  route uses it.
+- **Result check:** the shared service helper `finish` (section 3): no NaN/±Inf, rounding,
+  no `-0`.
+- **Handler:** one generic `binary(op)` serves every operation; the route is
+  `r.POST(PathX, binary(calc.X))`.
+
+### 6.1 Implemented operations
+
+| Operation | Path | Service method | Result | Math errors (422) |
+|---|---|---|---|---|
+| add | `POST /api/v1/add` | `Calculator.Add` | `leftOperand + rightOperand` | `result.overflow` |
+| subtract | `POST /api/v1/subtract` | `Calculator.Subtract` | `leftOperand - rightOperand` | `result.overflow` |
+
+Notes per operation:
+
+- **add:** overflows when both operands are large with the same sign
+  (`1.7e308 + 1.7e308`, `-1.7e308 + -1.7e308`). Can't produce NaN from finite operands.
+- **subtract:** operand order matters (`3 - 5 = -2`). Overflows when the operands are large
+  with opposite signs (`1.7e308 - -1.7e308`, `-1.7e308 - 1.7e308`). A number minus itself
+  is `0`, and `-0 - 0` is normalized to `0`. Can't produce NaN from finite operands.
+
+### 6.2 Adding a two-operand operation
+
+1. **Spec:** add the path to `api/openapi.yaml`, copying an existing operation's request
+   body and responses; change `operationId`, `summary` and `description`. List any new
+   math error code in the 422 description.
+2. **Service:** add `func (*Calculator) X(a, b float64, p Precision) (float64, error)` that
+   computes the raw result and passes it through `finish`, wrapping errors with context
+   (`fmt.Errorf("x %g and %g: %w", a, b, err)`). Operation-specific failures (e.g.
+   division by zero) return an `apperror` sentinel before `finish`.
+3. **Handler:** add `X` to the `Calculator` interface, `PathX` to `constants.go`, and
+   `r.POST(PathX, binary(calc.X))` to `routes.go`. Add `X` to `fakeCalculator`.
+4. **Tests:** a service `TestX` table (results, operand order, rounding, overflow in both
+   directions, `-0`, any operation-specific error); a handler `TestX` table (results, math
+   errors, a few validation rows); add rows to `TestOperationsNeverReturnNegativeZero` and
+   the operation to `TestOperationServiceErrors`.
+5. **Docs:** a row in 6.1 and its notes, examples in 6.3, and the "Implemented so far" line
+   in `AGENTS.md`.
+
+### 6.3 Examples
+
+Shared by every two-operand operation (`<op>` is `add`, `subtract`, ...):
 
 ```
-{"leftOperand": 1.5, "rightOperand": 2}
-  → 200 {"result": 3.5}
-
+POST /api/v1/<op>
 {"leftOperand": 1e309, "rightOperand": "x"}
   → 422 [{"field":"leftOperand","code":"error.field.out.of.range"},
          {"field":"rightOperand","code":"error.field.invalid.type"}]
@@ -136,8 +184,21 @@ What the implementation has to handle:
 {"leftOperand": 1, "rightOperand"
   → 400 {"code":"error.request.invalid.json"}
 
-{"leftOperand": 1.7e308, "rightOperand": 1.7e308}
-  → 422 {"code":"error.calculation.result.overflow"}
+{"leftOperand": 1, "rightOperand": 2, "precision": 2.5}
+  → 422 [{"field":"precision","code":"error.field.invalid.type"}]
+
+{"zzz": 0, "precision": -1, "rightOperand": "x"}
+  → 422 [{"field":"leftOperand","code":"error.field.required"},
+         {"field":"rightOperand","code":"error.field.invalid.type"},
+         {"field":"precision","code":"error.field.out.of.range"},
+         {"field":"zzz","code":"error.field.unknown"}]
+```
+
+`POST /api/v1/add`:
+
+```
+{"leftOperand": 1.5, "rightOperand": 2}
+  → 200 {"result": 3.5}
 
 {"leftOperand": 0.1, "rightOperand": 0.2}
   → 200 {"result": 0.30000000000000004}
@@ -145,15 +206,37 @@ What the implementation has to handle:
 {"leftOperand": 0.1, "rightOperand": 0.2, "precision": 2}
   → 200 {"result": 0.3}
 
-{"leftOperand": 1, "rightOperand": 2, "precision": 2.5}
-  → 422 [{"field":"precision","code":"error.field.invalid.type"}]
-
 {"leftOperand": 1e-400, "rightOperand": -0}
   → 200 {"result": 0}
+
+{"leftOperand": 1.7e308, "rightOperand": 1.7e308}
+  → 422 {"code":"error.calculation.result.overflow"}
 ```
 
-Layering: spec path + `BinaryOperationRequest` schema first, then a shared handler `decodeBinaryRequest`
-(reused by every binary operation), then the service `Add(a, b float64, p service.Precision) (float64, error)`.
+`POST /api/v1/subtract`:
+
+```
+{"leftOperand": 5, "rightOperand": 1.5}
+  → 200 {"result": 3.5}
+
+{"leftOperand": 3, "rightOperand": 5}
+  → 200 {"result": -2}
+
+{"leftOperand": 0.3, "rightOperand": 0.1}
+  → 200 {"result": 0.19999999999999998}
+
+{"leftOperand": 0.3, "rightOperand": 0.1, "precision": 2}
+  → 200 {"result": 0.2}
+
+{"leftOperand": -0, "rightOperand": 0}
+  → 200 {"result": 0}
+
+{"leftOperand": -1.7e308, "rightOperand": 1.7e308}
+  → 422 {"code":"error.calculation.result.overflow"}
+```
+
+### 6.4 Implementation notes
+
 `service.Precision`'s zero value means "no rounding"; `service.RoundTo(n)` sets it.
 
 `error.validation.failed` stays as an internal code: it selects the 422 status in

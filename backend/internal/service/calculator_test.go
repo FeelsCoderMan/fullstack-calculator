@@ -157,8 +157,109 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestSubtract(t *testing.T) {
+	negZero := math.Copysign(0, -1)
+
+	tests := []struct {
+		name    string
+		a, b    float64
+		p       Precision
+		want    float64
+		wantErr error
+	}{
+		{
+			name: "integers",
+			a:    5,
+			b:    3,
+			want: 2,
+		},
+		{
+			name: "operand order matters",
+			a:    3,
+			b:    5,
+			want: -2,
+		},
+		{
+			name: "subtracting a negative adds",
+			a:    -1.5,
+			b:    -2.25,
+			want: 0.75,
+		},
+		{
+			name: "float noise is kept without precision",
+			a:    0.3,
+			b:    0.1,
+			want: 0.19999999999999998,
+		},
+		{
+			name: "rounds to precision",
+			a:    0.3,
+			b:    0.1,
+			p:    RoundTo(2),
+			want: 0.2,
+		},
+		{
+			name: "number minus itself is positive zero",
+			a:    -2.5,
+			b:    -2.5,
+			want: 0,
+		},
+		{
+			name: "negative zero minus zero is positive zero",
+			a:    negZero,
+			b:    0,
+			want: 0,
+		},
+		{
+			name: "rounding to negative zero gives positive zero",
+			a:    0,
+			b:    0.001,
+			p:    RoundTo(2),
+			want: 0,
+		},
+		{
+			name: "largest float minus zero",
+			a:    math.MaxFloat64,
+			b:    0,
+			want: math.MaxFloat64,
+		},
+		{
+			name: "largest float minus itself",
+			a:    math.MaxFloat64,
+			b:    math.MaxFloat64,
+			want: 0,
+		},
+		{
+			name:    "positive overflow",
+			a:       math.MaxFloat64,
+			b:       -math.MaxFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "negative overflow",
+			a:       -math.MaxFloat64,
+			b:       math.MaxFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+	}
+
+	calc := NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calc.Subtract(tt.a, tt.b, tt.p)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Subtract(%g, %g, %+v) error = %v, want %v", tt.a, tt.b, tt.p, err, tt.wantErr)
+			}
+			if got != tt.want || math.Signbit(got) != math.Signbit(tt.want) {
+				t.Errorf("Subtract(%g, %g, %+v) = %g, want %g", tt.a, tt.b, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestFinish covers the result checks every operation shares, including NaN,
-// which Add can't produce from finite operands.
+// which no operation so far can produce from finite operands.
 func TestFinish(t *testing.T) {
 	tests := []struct {
 		name    string

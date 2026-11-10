@@ -44,6 +44,16 @@ func (*Calculator) Add(a, b float64, p Precision) (float64, error) {
 	return r, nil
 }
 
+// Subtract returns a - b, rounded to p. It fails with
+// apperror.ErrResultOverflow when the difference is beyond the float64 range.
+func (*Calculator) Subtract(a, b float64, p Precision) (float64, error) {
+	r, err := finish(a-b, p)
+	if err != nil {
+		return 0, fmt.Errorf("subtract %g from %g: %w", b, a, err)
+	}
+	return r, nil
+}
+
 // finish turns a raw float64 result into an API result. It runs on every
 // operation's result, in this order:
 //  1. NaN and ±Inf are errors, never results.

@@ -80,6 +80,36 @@ paths:
           $ref: "#/components/responses/InternalError"
 
 
+  /api/v1/subtract:
+    post:
+      tags: [calculator]
+      operationId: subtract
+      summary: Subtract two numbers
+      description: Returns `leftOperand - rightOperand`, optionally rounded to `precision` decimal places.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinaryOperationRequest"
+            example:
+              leftOperand: 5
+              rightOperand: 1.5
+      responses:
+        "200":
+          $ref: "#/components/responses/Result"
+        "400":
+          $ref: "#/components/responses/InvalidJSON"
+        "413":
+          $ref: "#/components/responses/BodyTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+
   /health:
     get:
       tags: [health]

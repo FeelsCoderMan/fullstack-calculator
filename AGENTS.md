@@ -215,7 +215,7 @@ shapes) are in [`backend/docs/operations.md`](backend/docs/operations.md).
 Two-operand operations take `{"leftOperand": number, "rightOperand": number, "precision"?:
 integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half away from
 zero; omitted or `null` means the full float64 result. Results are always finite and never
-`-0`. Implemented so far: `add`. `sqrt` gets its own request shape, designed separately.
+`-0`. Implemented so far: `add`, `subtract`. `sqrt` gets its own request shape, designed separately.
 
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|
