@@ -1,0 +1,21 @@
+# Air hot-reload config. DEVELOPMENT ONLY. Not used by builds, tests, or Docker.
+# Run from backend/:  make dev   (= go tool -modfile=tools.mod air)
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  entrypoint = ["./tmp/server"]
+  include_ext = ["go", "yaml"]
+  exclude_dir = ["tmp", "vendor", "logs"]
+  exclude_regex = ["_test\\.go$"]
+  delay = 500
+  stop_on_error = true
+  send_interrupt = true   # SIGINT so the server's graceful shutdown runs on reload
+  kill_delay = "11s"      # > SHUTDOWN_TIMEOUT in .env.example (10s); air returns as soon as the process exits
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

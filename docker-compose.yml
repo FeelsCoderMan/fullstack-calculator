@@ -1,0 +1,27 @@
+name: fullstack-calculator
+
+services:
+  backend:
+    build:
+      context: ./backend
+    image: fullstack-calculator-backend
+    # Runtime config, required (the backend has no defaults).
+    # Create it with: cp backend/.env.example backend/.env
+    env_file:
+      - path: ./backend/.env
+        required: true
+    ports:
+      - "8080:8080"
+    healthcheck:
+      # $$ defers expansion to the container, which sees PORT from backend/.env.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$${PORT}/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    # Longer than SHUTDOWN_TIMEOUT so the graceful drain finishes before SIGKILL.
+    stop_grace_period: 15s
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true

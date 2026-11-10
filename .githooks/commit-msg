@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Git commit-msg hook: enforces Conventional Commits 1.0.0 with this repo's rules
+# (the same rules the committer subagent follows, see .claude/agents/committer.md).
+# Enabled with the other hooks: make -C backend hooks
+#
+# Usage (by git): commit-msg <path-to-message-file>
+set -euo pipefail
+
+msg_file="$1"
+max_len=72
+types='feat|fix|refactor|perf|test|docs|style|build|ci|chore|revert'
+scopes='backend|frontend|handler|service|config|logger|server|apperror|api|docker|deps|claude|githooks|readme'
+non_imperative='added|adds|adding|fixed|fixes|fixing|updated|updates|updating|removed|removes|removing|changed|changes|changing|created|creates|creating|implemented|implements|implementing|refactored|refactors|refactoring|moved|moves|moving|renamed|renames|renaming|deleted|deletes|deleting|improved|improves|improving'
+
+# The message as git will store it: drop comment lines and everything below the
+# `git commit -v` scissors line, then trailing blank lines.
+comment_char="$(git config --get core.commentChar 2>/dev/null || echo '#')"
+[ "$comment_char" = "auto" ] && comment_char='#'
+mapfile -t lines < <(
+	awk -v c="$comment_char" '
+		/^# -+ >8 -+$/ { exit }
+		index($0, c) == 1 { next }
+		{ sub(/[[:space:]]+$/, ""); print }
+	' "$msg_file" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+)
+
+errors=()
+err() { errors+=("$*"); }
+
+subject="${lines[0]:-}"
+
+# Messages git generates itself, and autosquash markers, are left alone.
+if [[ "$subject" =~ ^(Merge\ |Revert\ \"|fixup!\ |squash!\ |amend!\ ) ]]; then
+	exit 0
+fi
+
+# --- Subject line --------------------------------------------------------------
+header_re="^(${types})(\(([a-z0-9-]+)\))?(!)?: (.+)$"
+if [ -z "$subject" ]; then
+	err "empty commit message"
+elif [[ ! "$subject" =~ $header_re ]]; then
+	err "subject must be '<type>(<scope>)!: <summary>', e.g. 'fix(config): treat empty env values as missing'"
+	err "allowed types: ${types//|/, }"
+else
+	scope="${BASH_REMATCH[3]}"
+	bang="${BASH_REMATCH[4]}"
+	summary="${BASH_REMATCH[5]}"
+
+	if [ -n "$scope" ] && [[ ! "$scope" =~ ^(${scopes})$ ]]; then
+		err "unknown scope '$scope'; use one of: ${scopes//|/, } (or omit the scope)"
+	fi
+	[[ "$summary" =~ ^[a-z0-9] ]] || err "summary must start with a lowercase letter: '$summary'"
+	[[ "$summary" == *. ]] && err "summary must not end with a period"
+	first_word="${summary%% *}"
+	if [[ "${first_word,,}" =~ ^(${non_imperative})$ ]]; then
+		err "use the imperative mood: '${first_word}' -> e.g. 'add', 'fix', 'update', 'remove'"
+	fi
+	if [[ "${summary,,}" =~ ^(wip|fix|fixes|update|updates|update\ stuff|misc|misc\ changes|changes|stuff|tmp|temp)$ ]]; then
+		err "summary '$summary' is too vague; say what changes"
+	fi
+fi
+if [ "${#subject}" -gt "$max_len" ]; then
+	err "subject is ${#subject} characters; the maximum is $max_len"
+fi
+
+# --- Body and footers -----------------------------------------------------------
+if [ "${#lines[@]}" -gt 1 ] && [ -n "${lines[1]}" ]; then
+	err "line 2 must be blank (separate the subject from the body)"
+fi
+
+has_breaking_footer=false
+for i in "${!lines[@]}"; do
+	[ "$i" -eq 0 ] && continue
+	line="${lines[$i]}"
+	[[ "$line" =~ ^BREAKING[\ -]CHANGE:\ .+ ]] && has_breaking_footer=true
+	# Long lines are allowed only when they cannot be wrapped (URLs, single tokens).
+	if [ "${#line}" -gt "$max_len" ] && [[ "$line" == *" "* ]] && [[ "$line" != *"://"* ]]; then
+		err "line $((i + 1)) is ${#line} characters; wrap the body at $max_len"
+	fi
+done
+
+if [ -n "${bang:-}" ] && ! $has_breaking_footer; then
+	err "'!' marks a breaking change; add a 'BREAKING CHANGE: <what to migrate>' footer"
+fi
+if $has_breaking_footer && [ -z "${bang:-}" ]; then
+	err "a BREAKING CHANGE footer needs '!' in the subject, e.g. 'feat(api)!: ...'"
+fi
+
+# --- Result ---------------------------------------------------------------------
+if [ "${#errors[@]}" -gt 0 ]; then
+	{
+		echo "commit-msg: the message does not follow Conventional Commits (see .claude/agents/committer.md):"
+		printf '  - %s\n' "${errors[@]}"
+		echo
+		echo "  subject: $subject"
+		echo "  format:  <type>(<scope>)!: <imperative summary, lowercase, no period, <= $max_len chars>"
+	} >&2
+	exit 1
+fi

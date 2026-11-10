@@ -1,0 +1,16 @@
+# Only go.mod, go.sum, cmd/ and internal/ (plus api/ once added) are needed to build.
+Dockerfile
+.dockerignore
+Makefile
+.air.toml
+tools.mod
+tools.sum
+bin/
+tmp/
+logs/
+coverage.out
+coverage.html
+*.test
+# Runtime config is injected by compose, never baked into the image.
+.env
+.env.*

@@ -1,0 +1,37 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Env files (commit only examples)
+.env
+.env.*
+!.env.example
+
+# Claude Code: share agents/settings, keep personal overrides local
+.claude/settings.local.json
+
+# ---- Backend (Go) ----
+backend/bin/
+/backend/server
+backend/tmp/
+backend/logs/
+backend/build-errors.log
+backend/coverage.out
+backend/coverage.html
+*.test
+*.prof
+
+# ---- Frontend (Node) ----
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

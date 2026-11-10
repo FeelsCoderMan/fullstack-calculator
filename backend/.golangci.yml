@@ -1,0 +1,164 @@
+# golangci-lint v2 configuration. Run via the Makefile (`make lint`, `make fmt`),
+# which uses the version pinned in tools.mod.
+# Reference: https://golangci-lint.run/docs/configuration/file/
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  # Fail instead of silently editing go.mod/go.sum.
+  modules-download-mode: readonly
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    # Bugs and correctness
+    - bodyclose # HTTP response bodies are closed
+    - contextcheck # context is passed down, not replaced with Background()
+    - errorlint # errors.Is/As and %w instead of == and %v
+    - err113 # sentinel errors (AGENTS.md: identity via %w + errors.Is)
+    - exhaustive # switch over enums covers every value
+    - gosec # security issues
+    - nilerr # returning nil while holding a non-nil err
+    - nilnil # (nil, nil) returns
+    - noctx # HTTP requests carry a context
+    - unparam # parameters that always receive the same value
+    # Style and idioms (AGENTS.md "Idiomatic Go")
+    - errname # ErrX sentinels, XError types
+    - gocritic
+    - misspell
+    - nolintlint # //nolint must be specific and explained
+    - perfsprint # cheaper alternatives to fmt.Sprintf
+    - revive # golint successor: naming, doc comments, receivers
+    - thelper # test helpers call t.Helper()
+    - unconvert # unnecessary type conversions
+    - usestdlibvars # http.MethodGet instead of "GET", etc.
+    # Project rules (AGENTS.md)
+    - depguard # gin only in internal/handler
+    - forbidigo # no fmt.Print / log package / os.Exit outside main
+    - sloglint # typed slog attributes only, static messages, snake_case keys
+
+  settings:
+    depguard:
+      rules:
+        gin-only-in-handler:
+          files:
+            - "$all"
+            - "!**/internal/handler/**"
+          deny:
+            - pkg: github.com/gin-gonic/gin
+              desc: "gin is confined to internal/handler (AGENTS.md Decision 8)"
+
+    errcheck:
+      check-type-assertions: true
+
+    exhaustive:
+      default-signifies-exhaustive: true
+
+    forbidigo:
+      forbid:
+        - pattern: ^(fmt\.Print.*|print|println)$
+          msg: "log with slog via internal/logger (AGENTS.md Logging)"
+        - pattern: ^log\.(Print|Fatal|Panic).*$
+          msg: "log with slog via internal/logger (AGENTS.md Logging)"
+        - pattern: ^os\.Exit$
+          msg: "only main may call os.Exit; return errors instead"
+      analyze-types: true
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - hugeParam # small config structs are passed by value on purpose
+        - unnamedResult # named results only where they document intent
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment # readability over struct packing
+        - shadow # `if err := ...` inside functions with a named err is idiomatic
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: var-declaration
+        - name: var-naming
+
+    sloglint:
+      attr-only: true # logger.Addr(...) etc., never "key", value
+      no-global: all # loggers come from logger.Factory
+      static-msg: true # variable data goes in attributes
+      no-raw-keys: true # keys only via typed constructors
+      key-naming-case: snake
+
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+      - std-error-handling
+    rules:
+      # Tests build ad-hoc errors and fixtures, and only main may exit the process.
+      - path: _test\.go
+        linters:
+          - err113
+          - gosec
+      # Table-driven logger tests pass the message under test as a variable.
+      - path: _test\.go
+        text: message should be a string literal or a constant
+        linters:
+          - sloglint
+      - path: cmd/server/
+        text: os\.Exit
+        linters:
+          - forbidigo
+
+issues:
+  # Report everything, not just the first few per linter.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofumpt # stricter gofmt
+    - gci # import grouping: std, third-party, this module
+  settings:
+    gofumpt:
+      # The module path has no dot, so without this gofumpt treats our own
+      # imports as standard library and fights gci's grouping.
+      module-path: fullstack-calculator/backend
+      extra:
+        group-params: true # func(a, b int) instead of func(a int, b int)
+        clothe-returns: true # no naked returns in functions with named results
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+  exclusions:
+    generated: lax

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Git pre-commit hook: the same gate as Claude Code's verifier, for every commit
+# made from a terminal or IDE. Enable it once per clone:
+#   make -C backend hooks        (runs: git config core.hooksPath .githooks)
+#
+# Runs .claude/scripts/verify.sh on exactly the staged changes (tidy, format,
+# vet, lint, race tests, govulncheck, no .env/artifacts/private keys). If the
+# staged tree was already verified (e.g. by the verifier subagent) and nothing
+# has changed since, the checks are not repeated.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+stamp="$(git rev-parse --git-path claude-verified-tree)"
+if [ -f "$stamp" ] && git diff --quiet && [ "$(cat "$stamp")" = "$(git write-tree)" ]; then
+	echo "pre-commit: staged changes already verified ($(cat "$stamp"))"
+	exit 0
+fi
+
+echo "pre-commit: verifying staged changes (bypass is not allowed; fix the failure instead)"
+exec "$root/.claude/scripts/verify.sh"
