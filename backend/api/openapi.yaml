@@ -229,6 +229,49 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/sqrt:
+    post:
+      tags: [calculator]
+      operationId: sqrt
+      summary: Square root of a whole number
+      description: |
+        Returns the square root of `operand`, optionally rounded to `precision`
+        decimal places.
+        - `operand` must be a whole number (`2.0` and `1e20` count; `2.25` is
+          422 `error.field.invalid.type`).
+        - A negative `operand` is 422 `error.calculation.negative.square.root`,
+          checked before computing. A negative decimal (`-2.5`) fails the
+          whole-number rule first.
+        - `0` and `-0` give `0`. The whole-number rule is checked after parsing:
+          an operand that underflows to `0` on input (`1e-400`) gives `0`,
+          while a tiny decimal float64 can still hold (`1e-320`) is
+          `error.field.invalid.type`.
+        - Before any `precision` rounding, the result is exactly rounded
+          (IEEE 754) and can neither overflow nor underflow: the square root of the largest float64 is
+          `1.3407807929942596e154`. Integers above 2^53 are read inexactly
+          (`9007199254740993` is `9007199254740992`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnaryOperationRequest"
+            example:
+              operand: 16
+      responses:
+        "200":
+          $ref: "#/components/responses/Result"
+        "400":
+          $ref: "#/components/responses/InvalidJSON"
+        "413":
+          $ref: "#/components/responses/BodyTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /health:
     get:
       tags: [health]
@@ -327,8 +370,9 @@ components:
           `error.calculation.result.overflow` (result beyond ±1.797e308),
           `error.calculation.result.undefined` (result is not a number), or
           an operation-specific code: `error.calculation.division.by.zero`
-          (`divide` only) or `error.calculation.zero.negative.power`
-          (`power` only).
+          (`divide` only), `error.calculation.zero.negative.power`
+          (`power` only) or `error.calculation.negative.square.root` (`sqrt`
+          only).
       headers:
         X-Request-ID:
           $ref: "#/components/headers/RequestID"
@@ -376,7 +420,7 @@ components:
           (or `-0`, or a value that underflows to 0 such as `1e-400`)
         - `error.calculation.zero.negative.power` (422): `power` with `leftOperand` 0 (or `-0`)
           and a negative `rightOperand`, i.e. `1 / 0`
-        - `error.calculation.negative.square.root` (422): `sqrt` with `a < 0`
+        - `error.calculation.negative.square.root` (422): `sqrt` with a negative `operand`
         - `error.calculation.result.overflow` (422): the result is infinite
         - `error.calculation.result.undefined` (422): the result is not a number
           (e.g. `power` with a negative base and a fractional exponent)
@@ -399,7 +443,8 @@ components:
       description: |
         Problem with a single request field.
         - `error.field.required`: missing or `null`
-        - `error.field.invalid.type`: not a JSON number (for `precision`: not an integer)
+        - `error.field.invalid.type`: not a JSON number (for `precision` and the
+          `sqrt` `operand`: not an integer)
         - `error.field.out.of.range`: not representable as a 64-bit float (for
           `precision`: outside 0-15)
         - `error.field.unknown`: property not expected in the body
@@ -437,6 +482,31 @@ components:
         rightOperand:
           type: number
           example: 2
+        precision:
+          description: |
+            Decimal places to round the result to. Omit it (or send `null`) for
+            the full float64 result.
+          type: integer
+          minimum: 0
+          maximum: 15
+          nullable: true
+          example: 2
+
+    UnaryOperationRequest:
+      description: |
+        Operand of a one-operand operation (`sqrt`). Every invalid field is
+        reported at once (`ValidationErrorResponse`), in the order `operand`,
+        `precision`, then unknown properties alphabetically.
+      type: object
+      additionalProperties: false
+      required: [operand]
+      properties:
+        operand:
+          description: |
+            A whole number. Negative values pass validation and fail the math
+            (`error.calculation.negative.square.root`).
+          type: integer
+          example: 16
         precision:
           description: |
             Decimal places to round the result to. Omit it (or send `null`) for

@@ -866,6 +866,201 @@ func TestPower(t *testing.T) {
 	}
 }
 
+// TestSqrt pins the square root, its one-operand body ({"operand",
+// "precision"?}) and the whole-number rule. The body has its own decoder, so
+// unlike the two-operand operations its validation is tested here in full.
+func TestSqrt(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
+	}{
+		// Success.
+		{
+			name:        "perfect square",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":16}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":4}`,
+		},
+		{
+			name:        "irrational root",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.4142135623730951}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":2,"precision":3}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.414}`,
+		},
+		{
+			name:        "zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "whole number written with a decimal point",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":9.0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "whole number in exponent notation",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1e20}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1e10}`,
+		},
+		{
+			name:        "largest float stays in range",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1.7976931348623157e308}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.3407807929942596e154}`,
+		},
+		{
+			name:        "operand below the float64 range underflows to zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1e-400}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "null precision means no rounding",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":2,"precision":null}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.4142135623730951}`,
+		},
+
+		// Math error.
+		{
+			name:        "negative whole number",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":-4}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.negative.square.root"}`,
+		},
+		{
+			name:        "negative whole number with precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":-1,"precision":2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.negative.square.root"}`,
+		},
+
+		// Field errors.
+		{
+			name:        "missing operand",
+			contentType: binding.MIMEJSON,
+			body:        `{}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.required"}]`,
+		},
+		{
+			name:        "null operand",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":null}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.required"}]`,
+		},
+		{
+			name:        "numeric string",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":"16"}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "decimal is not a whole number",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":2.25}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "tiny decimal that survives parsing is not a whole number",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1e-320}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "negative decimal fails the whole-number rule first",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":-2.5}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "operand beyond float64 range",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1e309}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.out.of.range"}]`,
+		},
+		{
+			name:        "two-operand fields are unknown here",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":16}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.required"},{"field":"leftOperand","code":"error.field.unknown"}]`,
+		},
+		{
+			name:        "every problem at once in a fixed order",
+			contentType: binding.MIMEJSON,
+			body:        `{"zeta":1,"precision":16,"operand":2.5,"alpha":1}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"},{"field":"precision","code":"error.field.out.of.range"},{"field":"alpha","code":"error.field.unknown"},{"field":"zeta","code":"error.field.unknown"}]`,
+		},
+
+		// Unreadable bodies.
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":16`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "JSON number instead of an object",
+			contentType: binding.MIMEJSON,
+			body:        `16`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"operand":16}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, rec := serveJSON(t, router, PathSqrt, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathSqrt, tt.body, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
 // TestOperationsNeverReturnNegativeZero checks the raw body: a semantic JSON
 // comparison treats -0 and 0 as equal.
 func TestOperationsNeverReturnNegativeZero(t *testing.T) {
@@ -944,6 +1139,16 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 			path: PathPower,
 			body: `{"leftOperand":-0.1,"rightOperand":3,"precision":2}`,
 		},
+		{
+			name: "sqrt of negative zero",
+			path: PathSqrt,
+			body: `{"operand":-0}`,
+		},
+		{
+			name: "sqrt of an operand that underflows to negative zero",
+			path: PathSqrt,
+			body: `{"operand":-1e-400}`,
+		},
 	}
 
 	router := newTestRouter()
@@ -981,6 +1186,10 @@ func (f fakeCalculator) Divide(float64, float64, service.Precision) (float64, er
 }
 
 func (f fakeCalculator) Power(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
+func (f fakeCalculator) Sqrt(float64, service.Precision) (float64, error) {
 	return 0, f.err
 }
 
@@ -1024,19 +1233,21 @@ func TestOperationServiceErrors(t *testing.T) {
 	operations := []struct {
 		name string
 		path string
+		body string
 	}{
-		{name: "add", path: PathAdd},
-		{name: "subtract", path: PathSubtract},
-		{name: "multiply", path: PathMultiply},
-		{name: "divide", path: PathDivide},
-		{name: "power", path: PathPower},
+		{name: "add", path: PathAdd, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "subtract", path: PathSubtract, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "multiply", path: PathMultiply, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "divide", path: PathDivide, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "power", path: PathPower, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "sqrt", path: PathSqrt, body: `{"operand":4}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := NewRouter(discardLogger(), fakeCalculator{err: tt.err})
 			for _, op := range operations {
 				t.Run(op.name, func(t *testing.T) {
-					req, rec := serveJSON(t, router, op.path, binding.MIMEJSON, `{"leftOperand":1,"rightOperand":2}`)
+					req, rec := serveJSON(t, router, op.path, binding.MIMEJSON, op.body)
 
 					if rec.Code != tt.wantStatus {
 						t.Errorf("POST %s with calculator error %v: status = %d, want %d", op.path, tt.err, rec.Code, tt.wantStatus)

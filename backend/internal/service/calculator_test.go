@@ -1038,6 +1038,126 @@ func TestPower(t *testing.T) {
 	}
 }
 
+func TestSqrt(t *testing.T) {
+	negZero := math.Copysign(0, -1)
+
+	tests := []struct {
+		name    string
+		x       float64
+		p       Precision
+		want    float64
+		wantErr error
+	}{
+		{
+			name: "perfect square",
+			x:    16,
+			want: 4,
+		},
+		{
+			name: "irrational root is exactly rounded",
+			x:    2,
+			want: 1.4142135623730951,
+		},
+		{
+			name: "rounds to precision",
+			x:    2,
+			p:    RoundTo(3),
+			want: 1.414,
+		},
+		{
+			name: "rounds down below half",
+			x:    99, // 9.9498743710662
+			p:    RoundTo(1),
+			want: 9.9,
+		},
+		{
+			name: "rounds a tie half away from zero",
+			x:    2.25, // 1.5; the service accepts any float64, the whole-number rule is the handler's
+			p:    RoundTo(0),
+			want: 2,
+		},
+		{
+			name: "zero",
+			x:    0,
+			want: 0,
+		},
+		{
+			name: "one",
+			x:    1,
+			want: 1,
+		},
+		{
+			name: "negative zero is not negative and gives positive zero",
+			x:    negZero,
+			want: 0,
+		},
+		{
+			name: "large perfect square",
+			x:    1e20,
+			want: 1e10,
+		},
+		{
+			name: "integer above 2^53 is read inexactly",
+			x:    9007199515875288, // 94906267^2 is ...289, which float64 holds as ...288
+			want: 94906267,
+		},
+
+		// Limits: a square root can't overflow or underflow.
+		{
+			name: "largest float stays in range",
+			x:    math.MaxFloat64,
+			want: 1.3407807929942596e154,
+		},
+		{
+			name: "largest power of ten",
+			x:    1e308,
+			want: 1e154,
+		},
+		{
+			name: "smallest float is in range",
+			x:    math.SmallestNonzeroFloat64,
+			want: 2.2227587494850775e-162,
+		},
+
+		// Negative input: no real root.
+		{
+			name:    "negative whole number",
+			x:       -4,
+			wantErr: apperror.ErrNegativeSquareRoot,
+		},
+		{
+			name:    "most negative float",
+			x:       -math.MaxFloat64,
+			wantErr: apperror.ErrNegativeSquareRoot,
+		},
+		{
+			name:    "negative is reported before rounding",
+			x:       -1,
+			p:       RoundTo(2),
+			wantErr: apperror.ErrNegativeSquareRoot,
+		},
+		{
+			name:    "NaN is undefined",
+			x:       math.NaN(),
+			wantErr: apperror.ErrResultUndefined,
+		},
+	}
+
+	calc := NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calc.Sqrt(tt.x, tt.p)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Sqrt(%g, %+v) error = %v, want %v", tt.x, tt.p, err, tt.wantErr)
+			}
+			if got != tt.want || math.Signbit(got) != math.Signbit(tt.want) {
+				t.Errorf("Sqrt(%g, %+v) = %g, want %g", tt.x, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestPowerOfTenIsExact checks every power of ten float64 can hold against
 // the decimal literal strconv parses. math.Pow gets 505 of these 632 wrong,
 // which is why integer exponents go through intPow.

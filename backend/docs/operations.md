@@ -1,6 +1,6 @@
 # Operation endpoints: design notes
 
-Status: **implemented for `add`, `subtract`, `multiply`, `divide` and `power`.** The normative rules are in `AGENTS.md` and
+Status: **implemented for `add`, `subtract`, `multiply`, `divide`, `power` and `sqrt`.** The normative rules are in `AGENTS.md` and
 `api/openapi.yaml`; this file keeps the decisions and their rationale for the remaining
 operations to follow.
 
@@ -21,8 +21,7 @@ An optional `precision` field controls rounding (see section 4).
 `field` in a field error is the JSON property name as sent: `leftOperand`, `rightOperand`,
 `precision`.
 
-`sqrt` is not covered here. It gets its own endpoint and request shape, designed separately
-(noted so far: it takes a positive integer).
+`sqrt` takes one operand instead: `{"operand": 16, "precision": 2}` (section 7).
 
 ## 2. Number type: `float64`
 
@@ -40,6 +39,7 @@ An optional `precision` field controls rounding (see section 4).
 | Result too large, e.g. `1.7e308 + 1.7e308`, `-1.7e308 - 1.7e308` | `math.IsInf(result, 0)` (covers both signs) | 422 `error.calculation.result.overflow` |
 | Result NaN, e.g. `(-8) ^ 0.5` | `math.IsNaN(result)` | 422 `error.calculation.result.undefined` |
 | Division by zero: divisor `0`, `-0`, or one that underflows to `0` (`1e-400`) | `b == 0` in `Divide`, **before** dividing | 422 `error.calculation.division.by.zero` (never reported as overflow or undefined) |
+| Square root of a negative number, e.g. `sqrt(-4)` | `x < 0` in `Sqrt`, **before** computing | 422 `error.calculation.negative.square.root` (never reported as undefined) |
 | Zero to a negative power: base `0`/`-0` (or one that underflows to `0`), exponent `< 0` | `a == 0 && b < 0` in `Power`, **before** computing | 422 `error.calculation.zero.negative.power` (never reported as overflow) |
 | Precision loss: integers above 2⁵³, e.g. `9007199254740993` → `9007199254740992`, `94906267 * 94906267` → `…288` (exact `…289`) | none | **accepted**, not an error |
 | Underflow: magnitude below ~2.5e-324 (half the smallest positive float64, `5e-324`; values just above it round up to `5e-324`), e.g. input `1e-400` or result `1e-200 * 1e-200` (two non-zero operands) | none | **accepted, becomes `0`**, not an error |
@@ -392,6 +392,75 @@ POST /api/v1/<op>
 `codeStatus` and is the `code` of the request log record, but it is not in `Codes()` or
 the spec and is never sent.
 
-## 7. Open questions
+## 7. One-operand operations: `sqrt`
 
-- **`sqrt`:** separate endpoint, designed later. Known so far: it takes a positive integer.
+| Operation | Path | Service method | Result | Math errors (422) |
+|---|---|---|---|---|
+| sqrt | `POST /api/v1/sqrt` | `Calculator.Sqrt` | `√operand` | `negative.square.root` |
+
+Decisions (made with the project owner):
+
+- **Request:** `UnaryOperationRequest`, `{"operand", "precision"?}`. `operand` was chosen
+  over `radicand` and `value`. `precision` works as for every other operation.
+- **Domain: whole numbers.** `operand` must be an integer; `2.0` and `1e20` count, `2.25`
+  is the field code `error.field.invalid.type` (as for a non-integer `precision`). `0` is
+  allowed. The rule is request validation, enforced by the handler (`fieldReader.integer`);
+  `Calculator.Sqrt` itself accepts any float64.
+- **Negative operand:** a math error, not a field error: 422
+  `error.calculation.negative.square.root` (the code already in the catalog). Validation
+  runs first, so a negative decimal (`-2.5`) is `invalid.type`, while `-4` is
+  `negative.square.root`. Checked before computing, because `math.Sqrt(-4)` is NaN, which
+  would be reported as undefined. `-0` is not negative: its root is `0`.
+- **Validation:** its own decoder, `decodeUnaryRequest`, reports every problem at once in
+  the order `operand`, `precision`, then unknown properties alphabetically. Two-operand
+  fields (`leftOperand`) are unknown here. The whole-number rule runs after parsing, so an
+  operand that underflows to `0` (`1e-400`) passes and gives `0`, while a tiny decimal that
+  float64 can hold (`1e-320`) is `invalid.type`.
+- **Adding another one-operand operation:** follow 6.2, with these differences: the spec
+  uses `UnaryOperationRequest`; the service method is `X(x float64, p Precision)`; the
+  route is `r.POST(PathX, unary(calc.X))`; the `operations` row in
+  `TestOperationServiceErrors` needs a one-operand `body`; and if the operand isn't a
+  whole number, add a field reader for its rule.
+
+Limits:
+
+- *Upper:* none. `math.Sqrt` is exactly rounded (IEEE 754), and the root of
+  `MaxFloat64` is `1.3407807929942596e154`, so it can't overflow.
+- *Lower:* none. The root of a whole number ≥ 1 is ≥ 1; `0` gives `0`. An operand that
+  underflows on input (`1e-400`) becomes `0` and gives `0`.
+- *Precision:* integers above 2⁵³ are read inexactly (`9007199254740993` → `…992`), as
+  everywhere. `94906267²` is exactly `…289`; float64 holds it as `…288`, whose root rounds
+  to `94906267`.
+- *Sign:* `sqrt(-0)` is `-0`, normalized to `0`.
+
+Examples, `POST /api/v1/sqrt`:
+
+```
+{"operand": 16}
+  → 200 {"result": 4}
+
+{"operand": 2}
+  → 200 {"result": 1.4142135623730951}
+
+{"operand": 2, "precision": 3}
+  → 200 {"result": 1.414}
+
+{"operand": 1.7976931348623157e308}
+  → 200 {"result": 1.3407807929942596e+154}
+
+{"operand": -4}
+  → 422 {"code":"error.calculation.negative.square.root"}
+
+{"operand": 2.25}
+  → 422 [{"field":"operand","code":"error.field.invalid.type"}]
+
+{"zeta": 1, "precision": 16, "operand": 2.5, "alpha": 1}
+  → 422 [{"field":"operand","code":"error.field.invalid.type"},
+         {"field":"precision","code":"error.field.out.of.range"},
+         {"field":"alpha","code":"error.field.unknown"},
+         {"field":"zeta","code":"error.field.unknown"}]
+```
+
+## 8. Open questions
+
+- **`percentage`:** not implemented yet. It can follow the checklist in 6.2.

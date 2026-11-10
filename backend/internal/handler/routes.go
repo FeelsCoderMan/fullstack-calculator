@@ -34,6 +34,7 @@ func NewRouter(accessLog *slog.Logger, calc Calculator) http.Handler {
 	r.POST(PathMultiply, binary(calc.Multiply))
 	r.POST(PathDivide, binary(calc.Divide))
 	r.POST(PathPower, binary(calc.Power))
+	r.POST(PathSqrt, unary(calc.Sqrt))
 
 	// API documentation: Swagger UI and the raw spec (api/openapi.yaml).
 	r.GET(PathSwaggerUI, SwaggerUI)

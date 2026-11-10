@@ -99,6 +99,23 @@ func (*Calculator) Power(a, b float64, p Precision) (float64, error) {
 	return r, nil
 }
 
+// Sqrt returns the square root of x, rounded to p. It fails with
+// apperror.ErrNegativeSquareRoot when x is negative, checked before computing
+// so it isn't reported as undefined (math.Sqrt returns NaN). -0 is not
+// negative; its root is 0. math.Sqrt is exactly rounded, and a square root
+// can't overflow or underflow. The API accepts only whole numbers for x; that
+// rule is request validation, enforced by the handler.
+func (*Calculator) Sqrt(x float64, p Precision) (float64, error) {
+	if x < 0 {
+		return 0, fmt.Errorf("square root of %g: %w", x, apperror.ErrNegativeSquareRoot)
+	}
+	r, err := finish(math.Sqrt(x), p)
+	if err != nil {
+		return 0, fmt.Errorf("square root of %g: %w", x, err)
+	}
+	return r, nil
+}
+
 // pow returns a^b. math.Pow is not correctly rounded: it is off in the last
 // digits for most integer exponents (10^308 is 1.0000000000000006e308) and
 // drifts further for bases near 1 (1.0000000001^1e10 is wrong from the 8th

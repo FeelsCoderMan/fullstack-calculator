@@ -14,6 +14,7 @@ const (
 	PathMultiply = "/api/v1/multiply"
 	PathDivide   = "/api/v1/divide"
 	PathPower    = "/api/v1/power"
+	PathSqrt     = "/api/v1/sqrt"
 )
 
 // Request body limits and properties.
@@ -23,6 +24,7 @@ const (
 
 	fieldLeftOperand  = "leftOperand"
 	fieldRightOperand = "rightOperand"
+	fieldOperand      = "operand"
 	fieldPrecision    = "precision"
 )
 

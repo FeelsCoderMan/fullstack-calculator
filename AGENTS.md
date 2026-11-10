@@ -189,7 +189,7 @@ fallback for unknown codes.
 | `error.request.invalid.json`             | 400  | body is not valid JSON / not a JSON object        |
 | `error.validation.failed`                | 422  | internal only: body is the bare field-error array  |
 | `error.field.required`                   | —    | field-level: operand missing or `null`             |
-| `error.field.invalid.type`               | —    | field-level: not a JSON number (`precision`: not an integer) |
+| `error.field.invalid.type`               | —    | field-level: not a JSON number (`precision`, `sqrt` `operand`: not an integer) |
 | `error.field.out.of.range`               | —    | field-level: not representable as float64 (`precision`: outside 0–15) |
 | `error.field.unknown`                    | —    | field-level: unexpected property in body           |
 | `error.request.not.found`                | 404  | unknown route                                      |
@@ -198,7 +198,7 @@ fallback for unknown codes.
 | `error.request.unsupported.media.type`   | 415  | `Content-Type` not `application/json`              |
 | `error.calculation.division.by.zero`     | 422  | `divide` with `rightOperand` 0 (or `-0`, or one that underflows to 0 like `1e-400`), checked before dividing |
 | `error.calculation.zero.negative.power`  | 422  | `power` with base 0 (or `-0`) and a negative exponent (`1 / 0`) |
-| `error.calculation.negative.square.root` | 422  | `sqrt` with `a < 0`                                |
+| `error.calculation.negative.square.root` | 422  | `sqrt` with a negative `operand`, checked before computing |
 | `error.calculation.result.overflow`      | 422  | result is ±Inf                                     |
 | `error.calculation.result.undefined`     | 422  | result is NaN (e.g. `power(-8, 0.5)`)              |
 | `error.internal`                         | 500  | unexpected failure (details only in server logs)   |
@@ -217,7 +217,9 @@ shapes) are in [`backend/docs/operations.md`](backend/docs/operations.md).
 Two-operand operations take `{"leftOperand": number, "rightOperand": number, "precision"?:
 integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half away from
 zero; omitted or `null` means the full float64 result. Results are always finite and never
-`-0`. Implemented so far: `add`, `subtract`, `multiply`, `divide`, `power`. `sqrt` gets its own request shape, designed separately.
+`-0`. `sqrt` takes one operand instead: `{"operand": integer, "precision"?: integer 0–15}`, where
+`operand` must be a whole number (a decimal is `error.field.invalid.type`). Implemented so
+far: `add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`.
 
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|
@@ -226,7 +228,7 @@ zero; omitted or `null` means the full float64 result. Results are always finite
 | POST   | `/api/v1/multiply`      | `{L, R, precision?}`          | `L * R`                |
 | POST   | `/api/v1/divide`        | `{L, R, precision?}`          | `L / R`                |
 | POST   | `/api/v1/power`         | `{L, R, precision?}`          | `L ^ R`                |
-| POST   | `/api/v1/sqrt`          | to be designed                | `√x`                   |
+| POST   | `/api/v1/sqrt`          | `{operand, precision?}`       | `√operand`             |
 | POST   | `/api/v1/percentage`    | `{L, R, precision?}`          | `L` percent of `R`     |
 | GET, HEAD | `/health`           | none                          | `204`, no body         |
 | GET    | `/swagger/`             | none                          | Swagger UI             |
