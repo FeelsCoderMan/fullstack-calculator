@@ -258,6 +258,176 @@ func TestSubtract(t *testing.T) {
 	}
 }
 
+func TestMultiply(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    float64
+		p       Precision
+		want    float64
+		wantErr error
+	}{
+		{
+			name: "integers",
+			a:    6,
+			b:    7,
+			want: 42,
+		},
+		{
+			name: "negative times positive is negative",
+			a:    -2.5,
+			b:    4,
+			want: -10,
+		},
+		{
+			name: "two negatives make a positive",
+			a:    -3,
+			b:    -4,
+			want: 12,
+		},
+		{
+			name: "float noise is kept without precision",
+			a:    1.1,
+			b:    1.1,
+			want: 1.2100000000000002,
+		},
+		{
+			name: "rounds to precision",
+			a:    1.1,
+			b:    1.1,
+			p:    RoundTo(2),
+			want: 1.21,
+		},
+		{
+			name: "times zero is zero",
+			a:    123.45,
+			b:    0,
+			want: 0,
+		},
+		{
+			name: "zero times a negative is positive zero",
+			a:    0,
+			b:    -5,
+			want: 0,
+		},
+		{
+			name: "rounding to negative zero gives positive zero",
+			a:    -0.01,
+			b:    0.1,
+			p:    RoundTo(2),
+			want: 0,
+		},
+		{
+			name: "integers above 2^53 lose precision without error",
+			a:    94906267,
+			b:    94906267,
+			want: 9007199515875288, // exact product is 9007199515875289
+		},
+
+		// Upper limit: ±1.7976931348623157e308.
+		{
+			name: "largest float times one",
+			a:    math.MaxFloat64,
+			b:    1,
+			want: math.MaxFloat64,
+		},
+		{
+			name: "largest float times minus one is the most negative float",
+			a:    math.MaxFloat64,
+			b:    -1,
+			want: -math.MaxFloat64,
+		},
+		{
+			name: "largest product of equal powers of ten",
+			a:    1e154,
+			b:    1e154,
+			want: 1e308,
+		},
+		{
+			name: "smallest float times largest float stays in range",
+			a:    math.SmallestNonzeroFloat64,
+			b:    math.MaxFloat64,
+			want: 8.881784197001251e-16,
+		},
+		{
+			name:    "largest float times the next float above one overflows",
+			a:       math.MaxFloat64,
+			b:       1.0000000000000002,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "positive overflow from moderate operands",
+			a:       1e155,
+			b:       1e155,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "negative overflow from moderate operands",
+			a:       -1e155,
+			b:       1e155,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "largest times most negative overflows negatively",
+			a:       math.MaxFloat64,
+			b:       -math.MaxFloat64,
+			wantErr: apperror.ErrResultOverflow,
+		},
+		{
+			name:    "overflow is reported before rounding",
+			a:       1e155,
+			b:       1e155,
+			p:       RoundTo(2),
+			wantErr: apperror.ErrResultOverflow,
+		},
+
+		// Lower limit: below ~2.5e-324 (half of 5e-324) a product underflows to 0 (accepted).
+		{
+			name: "subnormal product is kept",
+			a:    1e-160,
+			b:    1e-160,
+			want: 1e-320,
+		},
+		{
+			name: "smallest float times 0.6 rounds up to the smallest float",
+			a:    math.SmallestNonzeroFloat64,
+			b:    0.6,
+			want: math.SmallestNonzeroFloat64,
+		},
+		{
+			name: "smallest float halved underflows to zero",
+			a:    math.SmallestNonzeroFloat64,
+			b:    0.5,
+			want: 0,
+		},
+		{
+			name: "two small non-zero operands underflow to zero",
+			a:    1e-200,
+			b:    1e-200,
+			want: 0,
+		},
+		{
+			name: "negative underflow gives positive zero",
+			a:    -1e-200,
+			b:    1e-200,
+			want: 0,
+		},
+	}
+
+	calc := NewCalculator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calc.Multiply(tt.a, tt.b, tt.p)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Multiply(%g, %g, %+v) error = %v, want %v", tt.a, tt.b, tt.p, err, tt.wantErr)
+			}
+			if got != tt.want || math.Signbit(got) != math.Signbit(tt.want) {
+				t.Errorf("Multiply(%g, %g, %+v) = %g, want %g", tt.a, tt.b, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestFinish covers the result checks every operation shares, including NaN,
 // which no operation so far can produce from finite operands.
 func TestFinish(t *testing.T) {

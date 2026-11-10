@@ -11,6 +11,7 @@ const (
 const (
 	PathAdd      = "/api/v1/add"
 	PathSubtract = "/api/v1/subtract"
+	PathMultiply = "/api/v1/multiply"
 )
 
 // Request body limits and properties.

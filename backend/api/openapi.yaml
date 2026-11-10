@@ -31,9 +31,13 @@ info:
       (`error.calculation.result.overflow`).
     - Precision: about 15-17 significant digits. Integers above 2^53
       (9007199254740992) are not exact: `9007199254740993` is read as
-      `9007199254740992`. This is accepted, not an error.
-    - Underflow: magnitudes below about 5e-324 become `0` (e.g. `1e-400`, or
-      `1e-200 * 1e-200`). This is accepted, not an error.
+      `9007199254740992`, and `94906267 * 94906267` is `9007199515875288`
+      (exactly `...289`). This is accepted, not an error.
+    - Underflow: magnitudes below about 2.5e-324 (half the smallest positive
+      float64, 5e-324) become `0` (e.g. `1e-400`, or `1e-200 * 1e-200`), even
+      when every operand is non-zero. Results between
+      about 2.2e-308 and 5e-324 are kept with fewer significant digits. This is
+      accepted, not an error.
     - Negative zero is never returned: a `-0` result is sent as `0`.
     - Float noise: `0.1 + 0.2` is `0.30000000000000004`. Send `precision` to
       round the result. Rounding is half away from zero on the number's
@@ -109,6 +113,39 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/multiply:
+    post:
+      tags: [calculator]
+      operationId: multiply
+      summary: Multiply two numbers
+      description: |
+        Returns `leftOperand * rightOperand`, optionally rounded to `precision`
+        decimal places. Products reach the float64 limits more easily than sums:
+        `1e155 * 1e155` overflows (422 `error.calculation.result.overflow`), and
+        two non-zero operands can underflow to `0` (`1e-200 * 1e-200`), which is
+        accepted. Products of integers above 2^53 are not exact.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinaryOperationRequest"
+            example:
+              leftOperand: 2.5
+              rightOperand: 4
+      responses:
+        "200":
+          $ref: "#/components/responses/Result"
+        "400":
+          $ref: "#/components/responses/InvalidJSON"
+        "413":
+          $ref: "#/components/responses/BodyTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /health:
     get:

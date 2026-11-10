@@ -435,6 +435,124 @@ func TestSubtract(t *testing.T) {
 	}
 }
 
+// TestMultiply pins the multiplication itself and its float64 limits. Body
+// validation is shared and covered in TestAdd; a few rows prove the route uses
+// it.
+func TestMultiply(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
+	}{
+		{
+			name:        "multiplies integers",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":6,"rightOperand":7}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":42}`,
+		},
+		{
+			name:        "negative times positive",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-2.5,"rightOperand":4}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":-10}`,
+		},
+		{
+			name:        "keeps float noise without precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.1,"rightOperand":1.1}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.2100000000000002}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.1,"rightOperand":1.1,"precision":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.21}`,
+		},
+		{
+			name:        "integer product above 2^53 loses precision without error",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":94906267,"rightOperand":94906267}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":9007199515875288}`,
+		},
+		{
+			name:        "largest product of equal powers of ten",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e154,"rightOperand":1e154}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1e308}`,
+		},
+		{
+			name:        "positive overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e155,"rightOperand":1e155}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "negative overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1e155,"rightOperand":1e155}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "subnormal product is kept",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-160,"rightOperand":1e-160}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1e-320}`,
+		},
+		{
+			name:        "product below the lower limit underflows to zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-200,"rightOperand":1e-200}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "every field problem at once",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e309,"rightOperand":true,"factor":2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.out.of.range"},{"field":"rightOperand","code":"error.field.invalid.type"},{"field":"factor","code":"error.field.unknown"}]`,
+		},
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":6,"rightOperand":7`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"leftOperand":6,"rightOperand":7}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, rec := serveJSON(t, router, PathMultiply, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathMultiply, tt.body, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
 // TestOperationsNeverReturnNegativeZero checks the raw body: a semantic JSON
 // comparison treats -0 and 0 as equal.
 func TestOperationsNeverReturnNegativeZero(t *testing.T) {
@@ -468,6 +586,21 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 			path: PathSubtract,
 			body: `{"leftOperand":0,"rightOperand":0.001,"precision":2}`,
 		},
+		{
+			name: "multiply zero by a negative number",
+			path: PathMultiply,
+			body: `{"leftOperand":0,"rightOperand":-5}`,
+		},
+		{
+			name: "multiply negative underflow",
+			path: PathMultiply,
+			body: `{"leftOperand":-1e-200,"rightOperand":1e-200}`,
+		},
+		{
+			name: "multiply rounding a small negative product",
+			path: PathMultiply,
+			body: `{"leftOperand":-0.01,"rightOperand":0.1,"precision":2}`,
+		},
 	}
 
 	router := newTestRouter()
@@ -493,6 +626,10 @@ func (f fakeCalculator) Add(float64, float64, service.Precision) (float64, error
 }
 
 func (f fakeCalculator) Subtract(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
+func (f fakeCalculator) Multiply(float64, float64, service.Precision) (float64, error) {
 	return 0, f.err
 }
 
@@ -539,6 +676,7 @@ func TestOperationServiceErrors(t *testing.T) {
 	}{
 		{name: "add", path: PathAdd},
 		{name: "subtract", path: PathSubtract},
+		{name: "multiply", path: PathMultiply},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

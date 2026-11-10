@@ -34,8 +34,9 @@ concrete snippets or diffs in your report; never claim to have changed anything.
     hand-written types that duplicate the generated OpenAPI types
   - **hardcoded strings**: any string literal in application code outside a constant/enum
     declaration or helper (routes, env names, header values, log messages, log attribute
-    keys, codes). Text inside `fmt.Errorf` is allowed inline. Also flag `const` blocks or
-    `errors.New` sentinels outside the package's `constants.go` / `errors.go`. See AGENTS.md
+    keys, codes). Format strings written directly in a `fmt.Errorf` or `fmt.Sprintf` call
+    are allowed inline (AGENTS.md exceptions). Also flag `const` blocks or `errors.New`
+    sentinels outside the package's `constants.go` / `errors.go`. See AGENTS.md
     "No hardcoded strings" for the full rules and exceptions
   - **logging**: anything other than `log/slog` JSON output, loggers without a
     `logger.Category`, loose key/value log calls (`l.Info(msg, "k", v)`, `With("k", v)`)

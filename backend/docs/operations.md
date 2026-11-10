@@ -1,6 +1,6 @@
 # Operation endpoints: design notes
 
-Status: **implemented for `add` and `subtract`.** The normative rules are in `AGENTS.md` and
+Status: **implemented for `add`, `subtract` and `multiply`.** The normative rules are in `AGENTS.md` and
 `api/openapi.yaml`; this file keeps the decisions and their rationale for the remaining
 operations to follow.
 
@@ -39,8 +39,9 @@ An optional `precision` field controls rounding (see section 4).
 | Operand too large, e.g. `1e309` / `-1e309` | `strconv.ParseFloat` returns `±Inf` + `strconv.ErrRange` | 422, field code `error.field.out.of.range` |
 | Result too large, e.g. `1.7e308 + 1.7e308`, `-1.7e308 - 1.7e308` | `math.IsInf(result, 0)` (covers both signs) | 422 `error.calculation.result.overflow` |
 | Result NaN | `math.IsNaN(result)` | 422 `error.calculation.result.undefined` |
-| Precision loss: integers above 2⁵³, e.g. `9007199254740993` → `9007199254740992` | none | **accepted**, not an error |
-| Underflow: magnitude below ~5e-324, e.g. input `1e-400` or result `1e-200 * 1e-200` | none | **accepted, becomes `0`**, not an error |
+| Precision loss: integers above 2⁵³, e.g. `9007199254740993` → `9007199254740992`, `94906267 * 94906267` → `…288` (exact `…289`) | none | **accepted**, not an error |
+| Underflow: magnitude below ~2.5e-324 (half the smallest positive float64, `5e-324`; values just above it round up to `5e-324`), e.g. input `1e-400` or result `1e-200 * 1e-200` (two non-zero operands) | none | **accepted, becomes `0`**, not an error |
+| Subnormal result: magnitude between ~2.2e-308 and ~5e-324, e.g. `1e-160 * 1e-160` = `1e-320` | none | **accepted**, kept with fewer significant digits |
 | Negative zero, e.g. `0 * -5`, `0 / -5`, `-0 + -0`, `-0 - 0`, input `-0`, `-1e-200 * 1e-200` | `result == 0` | **normalized to `0`**: the API never returns `-0` |
 
 The precision-loss and underflow limits are documented in the API description in
@@ -144,6 +145,7 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 |---|---|---|---|---|
 | add | `POST /api/v1/add` | `Calculator.Add` | `leftOperand + rightOperand` | `result.overflow` |
 | subtract | `POST /api/v1/subtract` | `Calculator.Subtract` | `leftOperand - rightOperand` | `result.overflow` |
+| multiply | `POST /api/v1/multiply` | `Calculator.Multiply` | `leftOperand * rightOperand` | `result.overflow` |
 
 Notes per operation:
 
@@ -152,6 +154,19 @@ Notes per operation:
 - **subtract:** operand order matters (`3 - 5 = -2`). Overflows when the operands are large
   with opposite signs (`1.7e308 - -1.7e308`, `-1.7e308 - 1.7e308`). A number minus itself
   is `0`, and `-0 - 0` is normalized to `0`. Can't produce NaN from finite operands.
+- **multiply:** reaches both float64 limits far more easily than a sum, because exponents
+  add up:
+  - *Upper:* moderate operands overflow (`1e155 * 1e155`, `-1e155 * 1e155`); the largest
+    in-range product of equal powers of ten is `1e154 * 1e154 = 1e308`, and even
+    `MaxFloat64 * 1.0000000000000002` overflows. Both signs give 422 `result.overflow`.
+  - *Lower:* it is the first operation where two non-zero operands give `0`
+    (`1e-200 * 1e-200`, `5e-324 * 0.5`). Accepted per the underflow policy (section 3);
+    results down to `5e-324` are kept as subnormals (`1e-160 * 1e-160 = 1e-320`).
+    `5e-324 * 1.7976931348623157e308` stays in range (`8.88e-16`).
+  - *Precision:* exact integer operands can give an inexact product above 2⁵³
+    (`94906267²` → `9007199515875288`, exact `…289`). Accepted.
+  - *Sign:* `0 * -5` and `-1e-200 * 1e-200` produce `-0`, normalized to `0`. Can't produce
+    NaN from finite operands (`0 * ±Inf` needs an infinite operand, which is rejected).
 
 ### 6.2 Adding a two-operand operation
 
@@ -173,7 +188,7 @@ Notes per operation:
 
 ### 6.3 Examples
 
-Shared by every two-operand operation (`<op>` is `add`, `subtract`, ...):
+Shared by every two-operand operation (`<op>` is `add`, `subtract`, `multiply`, ...):
 
 ```
 POST /api/v1/<op>
@@ -233,6 +248,34 @@ POST /api/v1/<op>
 
 {"leftOperand": -1.7e308, "rightOperand": 1.7e308}
   → 422 {"code":"error.calculation.result.overflow"}
+```
+
+`POST /api/v1/multiply`:
+
+```
+{"leftOperand": 6, "rightOperand": 7}
+  → 200 {"result": 42}
+
+{"leftOperand": 1.1, "rightOperand": 1.1}
+  → 200 {"result": 1.2100000000000002}
+
+{"leftOperand": 1.1, "rightOperand": 1.1, "precision": 2}
+  → 200 {"result": 1.21}
+
+{"leftOperand": 1e154, "rightOperand": 1e154}
+  → 200 {"result": 1e+308}
+
+{"leftOperand": 1e155, "rightOperand": -1e155}
+  → 422 {"code":"error.calculation.result.overflow"}
+
+{"leftOperand": 1e-160, "rightOperand": 1e-160}
+  → 200 {"result": 1e-320}
+
+{"leftOperand": 1e-200, "rightOperand": 1e-200}
+  → 200 {"result": 0}
+
+{"leftOperand": 94906267, "rightOperand": 94906267}
+  → 200 {"result": 9007199515875288}
 ```
 
 ### 6.4 Implementation notes

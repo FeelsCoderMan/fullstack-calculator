@@ -53,7 +53,7 @@ func (e *Error) Error() string {
 	if e.cause == nil {
 		return string(e.Code)
 	}
-	return fmt.Sprintf(errorWithCauseFormat, e.Code, e.cause)
+	return fmt.Sprintf("%s: %v", e.Code, e.cause)
 }
 
 // Unwrap returns the cause, so errors.Is and errors.As see through an Error.
@@ -76,7 +76,7 @@ func (e *Error) Stack() []string {
 	out := make([]string, 0, len(e.stack))
 	for {
 		f, more := frames.Next()
-		out = append(out, fmt.Sprintf(stackFrameFormat, shortFunc(f.Function), shortPath(f.File), f.Line))
+		out = append(out, fmt.Sprintf("%s %s:%d", shortFunc(f.Function), shortPath(f.File), f.Line))
 		if !more {
 			return out
 		}
@@ -93,7 +93,7 @@ func Internal(err error) *Error {
 // Panic builds a CodeInternal error from a recovered panic value. Call it in
 // the deferred function that recovered, so the stack includes the panic site.
 func Panic(v any) *Error {
-	return &Error{Code: CodeInternal, cause: fmt.Errorf(panicFormat, ErrPanic, v), stack: capture()}
+	return &Error{Code: CodeInternal, cause: fmt.Errorf("%w: %v", ErrPanic, v), stack: capture()}
 }
 
 // Validation builds a CodeValidationFailed error listing every field problem.

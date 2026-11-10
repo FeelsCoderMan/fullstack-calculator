@@ -53,8 +53,7 @@ references the name or calls a helper that builds the value.
     `const CodeDivisionByZero Code = "error.calculation.division.by.zero"`, or
     `type Category string`.
   - Use an untyped `const` block for one-off values: env var names, defaults, routes and
-    paths, header names and values, log messages, log attribute keys, and non-error format
-    strings (`addrFormat = ":%d"`).
+    paths, header names and values, log messages, and log attribute keys.
   - Use helpers for derived values, e.g. `logger.FileName(category, t)`.
   - **Error text is not enumerated.** Messages passed to `fmt.Errorf` are written inline
     at the call site, e.g. `fmt.Errorf("listen on %s: %w", addr, err)`. They are developer
@@ -66,7 +65,9 @@ references the name or calls a helper that builds the value.
     from the generated OpenAPI types, CSS class names, storage keys.
   - User-facing text comes **only** from `src/i18n`.
 - **Allowed exceptions**:
-  - format strings and messages inside `fmt.Errorf(...)`
+  - format strings written directly in a `fmt` formatting call (`fmt.Errorf`, `fmt.Sprintf`),
+    e.g. `fmt.Sprintf("%s %s:%d", fn, file, line)`. A format string is most readable next to
+    its arguments; a constant may still be used when it is reused or names a contract.
   - struct tags (`json:"a"`)
   - the empty string `""` as a zero-value check (`if v != ""`)
   - test files asserting **exact wire output** (expected JSON bodies, status payloads). The
@@ -215,7 +216,7 @@ shapes) are in [`backend/docs/operations.md`](backend/docs/operations.md).
 Two-operand operations take `{"leftOperand": number, "rightOperand": number, "precision"?:
 integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half away from
 zero; omitted or `null` means the full float64 result. Results are always finite and never
-`-0`. Implemented so far: `add`, `subtract`. `sqrt` gets its own request shape, designed separately.
+`-0`. Implemented so far: `add`, `subtract`, `multiply`. `sqrt` gets its own request shape, designed separately.
 
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|
