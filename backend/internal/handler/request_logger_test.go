@@ -110,12 +110,12 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 			path: "/api/v1/add",
 			handler: func(c *gin.Context) {
 				writeError(c, apperror.Validation(
-					apperror.FieldError{Field: "a", Code: apperror.CodeFieldRequired},
-					apperror.FieldError{Field: "b", Code: apperror.CodeFieldInvalidType},
+					apperror.FieldError{Field: "leftOperand", Code: apperror.CodeFieldRequired},
+					apperror.FieldError{Field: "rightOperand", Code: apperror.CodeFieldInvalidType},
 				))
 			},
-			wantStatus: http.StatusBadRequest,
-			wantBody:   `{"code":"error.validation.failed","errors":[{"field":"a","code":"error.field.required"},{"field":"b","code":"error.field.invalid.type"}]}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantBody:   `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.invalid.type"}]`,
 			wantLevel:  "INFO",
 			wantCode:   "error.validation.failed",
 			wantError:  "error.validation.failed",

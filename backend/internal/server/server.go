@@ -18,13 +18,14 @@ import (
 	"fullstack-calculator/backend/internal/config"
 	"fullstack-calculator/backend/internal/handler"
 	"fullstack-calculator/backend/internal/logger"
+	"fullstack-calculator/backend/internal/service"
 )
 
 // handlerFactory builds the root HTTP handler from the configured loggers.
 type handlerFactory func(logs *logger.Factory) http.Handler
 
 func newRouter(logs *logger.Factory) http.Handler {
-	return handler.NewRouter(logs.Logger(logger.CategoryHTTP))
+	return handler.NewRouter(logs.Logger(logger.CategoryHTTP), service.NewCalculator())
 }
 
 // App is a configured HTTP server that is already listening. Call Run exactly

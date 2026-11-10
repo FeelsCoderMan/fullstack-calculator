@@ -1,0 +1,433 @@
+package handler
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/gin-gonic/gin/binding"
+
+	"fullstack-calculator/backend/internal/apperror"
+	"fullstack-calculator/backend/internal/service"
+)
+
+func TestAdd(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantStatus  int
+		wantBody    string
+	}{
+		// Success.
+		{
+			name:        "adds integers",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "adds negative decimals",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1.5,"rightOperand":-2.25}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":-3.75}`,
+		},
+		{
+			name:        "keeps float noise without precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0.1,"rightOperand":0.2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.30000000000000004}`,
+		},
+		{
+			name:        "rounds to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0.1,"rightOperand":0.2,"precision":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.3}`,
+		},
+		{
+			name:        "precision zero rounds half away from zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":2,"rightOperand":0.5,"precision":0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "precision 2.0 counts as an integer",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.005,"rightOperand":0,"precision":2.0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.01}`,
+		},
+		{
+			name:        "null precision means no rounding",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0.1,"rightOperand":0.2,"precision":null}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.30000000000000004}`,
+		},
+		{
+			name:        "exponent notation operands",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e308,"rightOperand":-1E308}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "operand below float64 range underflows to zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e-400,"rightOperand":0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "integer above 2^53 loses precision without error",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":9007199254740993,"rightOperand":0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":9007199254740992}`,
+		},
+		{
+			name:        "precision at the upper bound",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0.1,"rightOperand":0.2,"precision":15}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.3}`,
+		},
+		{
+			name:        "precision negative zero counts as zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.25,"rightOperand":1.25,"precision":-0}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "content type in upper case",
+			contentType: "Application/JSON",
+			body:        `{"leftOperand":1,"rightOperand":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "content type with charset",
+			contentType: "application/json; charset=utf-8",
+			body:        `{"leftOperand":1,"rightOperand":2}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+		{
+			name:        "whitespace after the object",
+			contentType: binding.MIMEJSON,
+			body:        "{\"leftOperand\":1,\"rightOperand\":2}\n\t ",
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":3}`,
+		},
+
+		// Math errors.
+		{
+			name:        "positive overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1.7e308,"rightOperand":1.7e308}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+		{
+			name:        "negative overflow",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":-1.7e308,"rightOperand":-1.7e308}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.result.overflow"}`,
+		},
+
+		// Field errors.
+		{
+			name:        "both operands missing",
+			contentType: binding.MIMEJSON,
+			body:        `{}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.required"}]`,
+		},
+		{
+			name:        "null operand is missing, zero is not",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":0,"rightOperand":null}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"rightOperand","code":"error.field.required"}]`,
+		},
+		{
+			name:        "numeric string and boolean are not numbers",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":"5","rightOperand":true}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.invalid.type"},{"field":"rightOperand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "object and array are not numbers",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":{},"rightOperand":[1]}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.invalid.type"},{"field":"rightOperand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "operands beyond float64 range in both directions",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1e309,"rightOperand":-1e309}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.out.of.range"},{"field":"rightOperand","code":"error.field.out.of.range"}]`,
+		},
+		{
+			name:        "precision is a string",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"precision":"2"}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"precision","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "precision is not an integer",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"precision":2.5}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"precision","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "precision below zero",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"precision":-1}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"precision","code":"error.field.out.of.range"}]`,
+		},
+		{
+			name:        "precision above fifteen",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"precision":16}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"precision","code":"error.field.out.of.range"}]`,
+		},
+		{
+			name:        "precision beyond float64 range",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"precision":1e400}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"precision","code":"error.field.out.of.range"}]`,
+		},
+		{
+			name:        "unknown properties are reported alphabetically",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"zeta":1,"a":2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"a","code":"error.field.unknown"},{"field":"zeta","code":"error.field.unknown"}]`,
+		},
+		{
+			name:        "old a and b names are unknown",
+			contentType: binding.MIMEJSON,
+			body:        `{"a":1,"b":2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.required"},{"field":"a","code":"error.field.unknown"},{"field":"b","code":"error.field.unknown"}]`,
+		},
+		{
+			name:        "duplicate property: the last value wins",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"leftOperand":"x","rightOperand":2}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.invalid.type"}]`,
+		},
+		{
+			name:        "every problem at once in a fixed order",
+			contentType: binding.MIMEJSON,
+			body:        `{"zzz":0,"precision":-1,"rightOperand":"x"}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.invalid.type"},{"field":"precision","code":"error.field.out.of.range"},{"field":"zzz","code":"error.field.unknown"}]`,
+		},
+
+		// Unreadable bodies.
+		{
+			name:        "empty body",
+			contentType: binding.MIMEJSON,
+			body:        ``,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "malformed JSON",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "JSON array instead of an object",
+			contentType: binding.MIMEJSON,
+			body:        `[1,2]`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "JSON null instead of an object",
+			contentType: binding.MIMEJSON,
+			body:        `null`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "JSON number instead of an object",
+			contentType: binding.MIMEJSON,
+			body:        `3`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "second object after the first",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2}{}`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "stray closing brace after the object",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2}}`,
+			wantStatus:  http.StatusBadRequest,
+			wantBody:    `{"code":"error.request.invalid.json"}`,
+		},
+		{
+			name:        "body over 1 MiB",
+			contentType: binding.MIMEJSON,
+			body:        `{"leftOperand":1,"rightOperand":2,"pad":"` + strings.Repeat("x", 1<<20) + `"}`,
+			wantStatus:  http.StatusRequestEntityTooLarge,
+			wantBody:    `{"code":"error.request.body.too.large"}`,
+		},
+		{
+			name:        "plain text content type",
+			contentType: "text/plain",
+			body:        `{"leftOperand":1,"rightOperand":2}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+		{
+			name:        "no content type",
+			contentType: "",
+			body:        `{"leftOperand":1,"rightOperand":2}`,
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantBody:    `{"code":"error.request.unsupported.media.type"}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, rec := serveJSON(t, router, PathAdd, tt.contentType, tt.body)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s %s status = %d, want %d", PathAdd, truncate(tt.body), rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
+// TestAddNeverReturnsNegativeZero checks the raw body: a semantic JSON
+// comparison treats -0 and 0 as equal.
+func TestAddNeverReturnsNegativeZero(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "negative zero operands",
+			body: `{"leftOperand":-0,"rightOperand":-0}`,
+		},
+		{
+			name: "negative underflow",
+			body: `{"leftOperand":-1e-400,"rightOperand":-0}`,
+		},
+		{
+			name: "rounding a small negative number",
+			body: `{"leftOperand":-0.001,"rightOperand":0,"precision":2}`,
+		},
+	}
+
+	router := newTestRouter()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, rec := serveJSON(t, router, PathAdd, binding.MIMEJSON, tt.body)
+
+			if got, want := rec.Body.String(), `{"result":0}`; got != want {
+				t.Errorf("POST %s %s body = %#v, want %#v", PathAdd, tt.body, got, want)
+			}
+		})
+	}
+}
+
+// fakeCalculator fails every operation with err, to reach responses the real
+// calculator can't produce.
+type fakeCalculator struct {
+	err error
+}
+
+func (f fakeCalculator) Add(float64, float64, service.Precision) (float64, error) {
+	return 0, f.err
+}
+
+var errDiskOnFire = errors.New("disk on fire")
+
+func TestAddServiceErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "wrapped expected failure keeps its code",
+			err:        fmt.Errorf("add: %w", apperror.ErrResultUndefined),
+			wantStatus: http.StatusUnprocessableEntity,
+			wantBody:   `{"code":"error.calculation.result.undefined"}`,
+		},
+		{
+			name:       "internal failure reveals only the internal code",
+			err:        apperror.Internal(errDiskOnFire),
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   `{"code":"error.internal"}`,
+		},
+		{
+			name:       "validation error without fields is internal",
+			err:        apperror.Validation(),
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   `{"code":"error.internal"}`,
+		},
+		{
+			name:       "plain error is internal",
+			err:        errDiskOnFire,
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   `{"code":"error.internal"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := NewRouter(discardLogger(), fakeCalculator{err: tt.err})
+			req, rec := serveJSON(t, router, PathAdd, binding.MIMEJSON, `{"leftOperand":1,"rightOperand":2}`)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("POST %s with Add error %v: status = %d, want %d", PathAdd, tt.err, rec.Code, tt.wantStatus)
+			}
+			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+			assertMatchesSpec(t, req, rec)
+		})
+	}
+}
+
+// truncate keeps failure messages readable for very large bodies.
+func truncate(body string) string {
+	maxLen := 80
+	if len(body) <= maxLen {
+		return body
+	}
+	return body[:maxLen] + "..."
+}

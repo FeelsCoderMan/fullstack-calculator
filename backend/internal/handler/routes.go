@@ -9,14 +9,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewRouter registers all HTTP routes on a gin engine behind RequestLogger.
+// NewRouter registers all HTTP routes on a gin engine behind RequestLogger,
+// serving the operations with calc.
 //
 // It returns an http.Handler rather than *gin.Engine so that callers (the
 // server wiring) stay framework-agnostic. The engine is built with gin.New,
 // not gin.Default: gin's own logger and recovery middleware write plain text,
 // while RequestLogger writes one JSON record per request and recovers panics
 // itself (docs/logging.md).
-func NewRouter(accessLog *slog.Logger) http.Handler {
+func NewRouter(accessLog *slog.Logger, calc Calculator) http.Handler {
 	// Debug mode prints plain-text route listings and warnings to stdout,
 	// which would break the JSON-lines log stream.
 	gin.SetMode(gin.ReleaseMode)
@@ -28,6 +29,7 @@ func NewRouter(accessLog *slog.Logger) http.Handler {
 	r.NoMethod(methodNotAllowed)
 
 	r.Match([]string{http.MethodGet, http.MethodHead}, PathHealth, Health)
+	r.POST(PathAdd, binary(calc.Add))
 
 	// API documentation: Swagger UI and the raw spec (api/openapi.yaml).
 	r.GET(PathSwaggerUI, SwaggerUI)

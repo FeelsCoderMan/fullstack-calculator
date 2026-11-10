@@ -16,7 +16,7 @@ func TestStatusFor(t *testing.T) {
 		want int
 	}{
 		{name: "invalid json", code: apperror.CodeRequestInvalidJSON, want: http.StatusBadRequest},
-		{name: "validation failed", code: apperror.CodeValidationFailed, want: http.StatusBadRequest},
+		{name: "validation failed", code: apperror.CodeValidationFailed, want: http.StatusUnprocessableEntity},
 		{name: "not found", code: apperror.CodeRequestNotFound, want: http.StatusNotFound},
 		{name: "method not allowed", code: apperror.CodeRequestMethodNotAllowed, want: http.StatusMethodNotAllowed},
 		{name: "body too large", code: apperror.CodeRequestBodyTooLarge, want: http.StatusRequestEntityTooLarge},

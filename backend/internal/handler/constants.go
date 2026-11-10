@@ -7,6 +7,24 @@ const (
 	PathSwaggerSpec = "/swagger/openapi.yaml"
 )
 
+// URL paths of the versioned API (api/openapi.yaml).
+const (
+	PathAdd = "/api/v1/add"
+)
+
+// Request body limits and properties.
+const (
+	// maxBodyBytes is the largest accepted request body (1 MiB).
+	maxBodyBytes = 1 << 20
+
+	fieldLeftOperand  = "leftOperand"
+	fieldRightOperand = "rightOperand"
+	fieldPrecision    = "precision"
+)
+
+// bitSize makes strconv parse numbers as float64.
+const bitSize = 64
+
 // Content types of the documentation endpoints.
 const (
 	contentTypeHTML = "text/html; charset=utf-8"

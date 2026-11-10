@@ -9,10 +9,14 @@ info:
 
     Conventions:
     - Success responses carry data only (or no body at all), never messages.
-    - Error responses carry a machine-readable `code` (`ErrorResponse`), plus
-      per-field codes for validation errors (`ValidationErrorResponse`). Never
-      human-readable text: the frontend maps codes to localized messages and
-      must fall back to a generic message for codes it doesn't know.
+    - Error responses carry a machine-readable `code` (`ErrorResponse`). A
+      validation error (422) is instead a bare array of per-field codes
+      (`ValidationErrorResponse`), every invalid field at once; tell the two
+      apart by checking whether the body is an array. Never human-readable
+      text: the frontend maps codes to localized messages and must fall back
+      to a generic message for codes it doesn't know.
+    - Status codes: `400` = the body can't be read as a JSON object; `422` = it
+      can be read, but a field or the math is invalid.
     - Every response carries an `X-Request-ID` header. Clients may send one
       (1-64 characters of `[A-Za-z0-9-]`); otherwise the server generates it.
       Quote it when reporting a problem: it identifies the request in the logs.
@@ -21,14 +25,61 @@ info:
       - `405` `error.request.method.not.allowed`: wrong method for a known path
       - `500` `error.internal`: unexpected failure; details are in the server logs only
 
+    Numbers are IEEE 754 64-bit floats (JavaScript's `number`), with these limits:
+    - Range: about ±1.797e308. A larger operand is rejected
+      (`error.field.out.of.range`) and a larger result is an error
+      (`error.calculation.result.overflow`).
+    - Precision: about 15-17 significant digits. Integers above 2^53
+      (9007199254740992) are not exact: `9007199254740993` is read as
+      `9007199254740992`. This is accepted, not an error.
+    - Underflow: magnitudes below about 5e-324 become `0` (e.g. `1e-400`, or
+      `1e-200 * 1e-200`). This is accepted, not an error.
+    - Negative zero is never returned: a `-0` result is sent as `0`.
+    - Float noise: `0.1 + 0.2` is `0.30000000000000004`. Send `precision` to
+      round the result. Rounding is half away from zero on the number's
+      shortest decimal form, as on paper: `2.675` at precision 2 is `2.68`,
+      `2.5` at precision 0 is `3`, `-2.5` is `-3`.
+
 servers:
   - url: /
 
 tags:
   - name: health
     description: Liveness of the service.
+  - name: calculator
+    description: Arithmetic operations.
 
 paths:
+  /api/v1/add:
+    post:
+      tags: [calculator]
+      operationId: add
+      summary: Add two numbers
+      description: Returns `leftOperand + rightOperand`, optionally rounded to `precision` decimal places.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinaryOperationRequest"
+            example:
+              leftOperand: 1.5
+              rightOperand: 2
+      responses:
+        "200":
+          $ref: "#/components/responses/Result"
+        "400":
+          $ref: "#/components/responses/InvalidJSON"
+        "413":
+          $ref: "#/components/responses/BodyTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+
   /health:
     get:
       tags: [health]
@@ -69,6 +120,85 @@ components:
         pattern: "^[A-Za-z0-9-]{1,64}$"
 
   responses:
+    Result:
+      description: The result of the operation.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ResultResponse"
+
+    InvalidJSON:
+      description: |
+        The body is not a JSON object: malformed JSON, trailing data after the
+        object, or another JSON value (array, string, `null`, ...).
+        Code: `error.request.invalid.json`.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: error.request.invalid.json
+
+    BodyTooLarge:
+      description: "The body exceeds 1 MiB. Code: `error.request.body.too.large`."
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: error.request.body.too.large
+
+    UnsupportedMediaType:
+      description: "`Content-Type` is not `application/json`. Code: `error.request.unsupported.media.type`."
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: error.request.unsupported.media.type
+
+    Unprocessable:
+      description: |
+        The body is a JSON object, but its content is invalid. Either:
+        - one or more fields are invalid: a bare array with one entry per
+          invalid field (`ValidationErrorResponse`), or
+        - the fields are valid but the math is not: `ErrorResponse` with
+          `error.calculation.result.overflow` (result beyond ±1.797e308) or
+          `error.calculation.result.undefined` (result is not a number).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ValidationErrorResponse"
+              - $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            validation:
+              summary: Invalid fields
+              value:
+                - field: leftOperand
+                  code: error.field.out.of.range
+                - field: rightOperand
+                  code: error.field.invalid.type
+            overflow:
+              summary: Result too large
+              value:
+                code: error.calculation.result.overflow
+
     InternalError:
       description: Unexpected failure. The cause is only in the server logs.
       headers:
@@ -86,7 +216,6 @@ components:
       description: |
         Top-level error code. Stable API contract: codes are added, never renamed.
         - `error.request.invalid.json` (400): body is not a valid JSON object
-        - `error.validation.failed` (400): one or more fields are invalid, see `errors`
         - `error.request.not.found` (404): unknown route
         - `error.request.method.not.allowed` (405): wrong HTTP method
         - `error.request.body.too.large` (413): body exceeds 1 MiB
@@ -99,7 +228,6 @@ components:
       type: string
       enum:
         - error.request.invalid.json
-        - error.validation.failed
         - error.request.not.found
         - error.request.method.not.allowed
         - error.request.body.too.large
@@ -114,8 +242,9 @@ components:
       description: |
         Problem with a single request field.
         - `error.field.required`: missing or `null`
-        - `error.field.invalid.type`: not a JSON number
-        - `error.field.out.of.range`: not representable as a 64-bit float
+        - `error.field.invalid.type`: not a JSON number (for `precision`: not an integer)
+        - `error.field.out.of.range`: not representable as a 64-bit float (for
+          `precision`: outside 0-15)
         - `error.field.unknown`: property not expected in the body
       type: string
       enum:
@@ -132,9 +261,44 @@ components:
         field:
           description: JSON property name as sent by the client.
           type: string
-          example: a
+          example: leftOperand
         code:
           $ref: "#/components/schemas/FieldErrorCode"
+
+    BinaryOperationRequest:
+      description: |
+        Operands of a two-operand operation. Every invalid field is reported at
+        once (`ValidationErrorResponse`), in the order `leftOperand`,
+        `rightOperand`, `precision`, then unknown properties alphabetically.
+      type: object
+      additionalProperties: false
+      required: [leftOperand, rightOperand]
+      properties:
+        leftOperand:
+          type: number
+          example: 1.5
+        rightOperand:
+          type: number
+          example: 2
+        precision:
+          description: |
+            Decimal places to round the result to. Omit it (or send `null`) for
+            the full float64 result.
+          type: integer
+          minimum: 0
+          maximum: 15
+          nullable: true
+          example: 2
+
+    ResultResponse:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result:
+          description: Always finite; never `-0`.
+          type: number
+          example: 3.5
 
     ErrorResponse:
       description: Body of every error response except validation errors.
@@ -145,28 +309,18 @@ components:
         code:
           $ref: "#/components/schemas/ErrorCode"
       example:
-        code: error.calculation.division.by.zero
+        code: error.calculation.result.overflow
 
     ValidationErrorResponse:
       description: |
-        Body of `error.validation.failed`. Lists every invalid field at once, in a
-        stable order.
-      type: object
-      additionalProperties: false
-      required: [code, errors]
-      properties:
-        code:
-          type: string
-          enum: [error.validation.failed]
-        errors:
-          type: array
-          minItems: 1
-          items:
-            $ref: "#/components/schemas/FieldError"
+        Body of a validation error (422): one entry per invalid field, every
+        invalid field at once, in a stable order. No envelope.
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/components/schemas/FieldError"
       example:
-        code: error.validation.failed
-        errors:
-          - field: a
-            code: error.field.required
-          - field: b
-            code: error.field.invalid.type
+        - field: leftOperand
+          code: error.field.required
+        - field: rightOperand
+          code: error.field.invalid.type

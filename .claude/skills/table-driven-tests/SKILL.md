@@ -135,7 +135,7 @@ tests := []struct {
 		name:       "adds two numbers",
 		method:     http.MethodPost,
 		path:       "/api/v1/add",
-		body:       `{"a":1,"b":2}`,
+		body:       `{"leftOperand":1,"rightOperand":2}`,
 		wantStatus: http.StatusOK,
 		wantBody:   `{"result":3}`,
 	},
@@ -144,14 +144,14 @@ tests := []struct {
 		method:     http.MethodPost,
 		path:       "/api/v1/add",
 		body:       `{}`,
-		wantStatus: http.StatusBadRequest,
-		wantBody:   `{"code":"error.validation.failed","errors":[{"field":"a","code":"error.field.required"},{"field":"b","code":"error.field.required"}]}`,
+		wantStatus: http.StatusUnprocessableEntity,
+		wantBody:   `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.required"}]`,
 	},
 }
 ```
 
 Compare JSON semantically (unmarshal both sides and `cmp.Diff`) so whitespace and key
-order don't cause false failures. Keep the order of `errors[]` significant, because the API
+order don't cause false failures. Keep the order of the field-error array significant, because the API
 guarantees a stable order.
 
 ## TypeScript (Vitest)

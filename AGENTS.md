@@ -142,22 +142,24 @@ No `message`, no `code`, no envelope.
 { "code": "error.calculation.division.by.zero" }
 ```
 
-### Validation error (400): code + per-field codes
+### Validation error (422): a bare array of field codes
 
-All field problems are reported at once, not just the first one.
+No envelope, no top-level `code`: the status says the request failed, and each entry says
+which field and why. All field problems are reported at once, not just the first one, in
+a stable order (the request's fields in schema order, then unknown properties
+alphabetically).
 
 ```json
-{
-  "code": "error.validation.failed",
-  "errors": [
-    { "field": "a", "code": "error.field.required" },
-    { "field": "b", "code": "error.field.invalid.type" }
-  ]
-}
+[
+  { "field": "leftOperand", "code": "error.field.required" },
+  { "field": "rightOperand", "code": "error.field.invalid.type" }
+]
 ```
 
-`field` is the JSON property name as sent by the client. The frontend maps `field` to its
-input and `code` to a localized message. It must have a generic fallback for unknown codes.
+`field` is the JSON property name as sent by the client. A 422 body is either this array
+or a `{code}` object (math errors); the frontend tells them apart with `Array.isArray`,
+maps `field` to its input and `code` to a localized message. It must have a generic
+fallback for unknown codes.
 
 ### Error code conventions
 
@@ -169,6 +171,9 @@ input and `code` to a localized message. It must have a generic fallback for unk
   top-level codes, `FieldCodes()` for field codes) and listed as the `ErrorCode` /
   `FieldErrorCode` enums in `openapi.yaml`. `TestCodesMatchSpec` keeps them identical. No
   string literals for codes elsewhere.
+- `error.validation.failed` is **internal**: it marks an error that carries field errors,
+  selects the 422 status and is the `code` of the request log record, but it is never sent
+  (so it is not in `Codes()` or the spec).
 - Code → HTTP status is mapped in exactly one place: `codeStatus` in
   `internal/handler/response.go` (`TestEveryCodeHasAStatus` catches a missing entry).
 - Expected failures return an `apperror` sentinel (`ErrDivisionByZero`, …), optionally wrapped
@@ -181,10 +186,10 @@ input and `code` to a localized message. It must have a generic fallback for unk
 | Code                                     | HTTP | When                                              |
 |------------------------------------------|------|---------------------------------------------------|
 | `error.request.invalid.json`             | 400  | body is not valid JSON / not a JSON object        |
-| `error.validation.failed`                | 400  | one or more field errors (see `errors[]`)          |
+| `error.validation.failed`                | 422  | internal only: body is the bare field-error array  |
 | `error.field.required`                   | —    | field-level: operand missing or `null`             |
-| `error.field.invalid.type`               | —    | field-level: operand not a JSON number             |
-| `error.field.out.of.range`               | —    | field-level: number not representable as float64   |
+| `error.field.invalid.type`               | —    | field-level: not a JSON number (`precision`: not an integer) |
+| `error.field.out.of.range`               | —    | field-level: not representable as float64 (`precision`: outside 0–15) |
 | `error.field.unknown`                    | —    | field-level: unexpected property in body           |
 | `error.request.not.found`                | 404  | unknown route                                      |
 | `error.request.method.not.allowed`       | 405  | wrong HTTP method                                  |
@@ -196,23 +201,31 @@ input and `code` to a localized message. It must have a generic fallback for unk
 | `error.calculation.result.undefined`     | 422  | result is NaN (e.g. `power(-8, 0.5)`)              |
 | `error.internal`                         | 500  | unexpected failure (details only in server logs)   |
 
-Rule of thumb: **400** = request shape is wrong; **422** = shape is fine but the math is
-invalid. Gin's default 404/405 plain-text responses (`NoRoute`/`NoMethod`) must be replaced
+Rule of thumb: **400** = the body can't be read as a JSON object; **422** = it can be read,
+but a field or the math is invalid. Gin's default 404/405 plain-text responses (`NoRoute`/`NoMethod`) must be replaced
 with the JSON codes above.
 
 ## API endpoints
 
 Base path `/api/v1`, JSON bodies. The full definitions are in `backend/api/openapi.yaml`.
 
+Design notes and rationale for the operations (number type, limits, rounding, error
+shapes) are in [`backend/docs/operations.md`](backend/docs/operations.md).
+
+Two-operand operations take `{"leftOperand": number, "rightOperand": number, "precision"?:
+integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half away from
+zero; omitted or `null` means the full float64 result. Results are always finite and never
+`-0`. Implemented so far: `add`. `sqrt` gets its own request shape, designed separately.
+
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|
-| POST   | `/api/v1/add`           | `{"a": number, "b": number}`  | `a + b`                |
-| POST   | `/api/v1/subtract`      | `{"a": number, "b": number}`  | `a - b`                |
-| POST   | `/api/v1/multiply`      | `{"a": number, "b": number}`  | `a * b`                |
-| POST   | `/api/v1/divide`        | `{"a": number, "b": number}`  | `a / b`                |
-| POST   | `/api/v1/power`         | `{"a": number, "b": number}`  | `a ^ b`                |
-| POST   | `/api/v1/sqrt`          | `{"a": number}`               | `√a`                   |
-| POST   | `/api/v1/percentage`    | `{"a": number, "b": number}`  | `a` percent of `b`     |
+| POST   | `/api/v1/add`           | `{L, R, precision?}`          | `L + R`                |
+| POST   | `/api/v1/subtract`      | `{L, R, precision?}`          | `L - R`                |
+| POST   | `/api/v1/multiply`      | `{L, R, precision?}`          | `L * R`                |
+| POST   | `/api/v1/divide`        | `{L, R, precision?}`          | `L / R`                |
+| POST   | `/api/v1/power`         | `{L, R, precision?}`          | `L ^ R`                |
+| POST   | `/api/v1/sqrt`          | to be designed                | `√x`                   |
+| POST   | `/api/v1/percentage`    | `{L, R, precision?}`          | `L` percent of `R`     |
 | GET, HEAD | `/health`           | none                          | `204`, no body         |
 | GET    | `/swagger/`             | none                          | Swagger UI             |
 | GET    | `/swagger/openapi.yaml` | none                          | raw spec               |
@@ -394,7 +407,7 @@ General rules:
   (`.claude/skills/table-driven-tests/SKILL.md`). Follow it, and don't duplicate its rules here.
 - Coverage expectations: service tests cover every operation and every error branch.
   Handler tests use `httptest` and assert the **status code and exact JSON body** (including
-  `errors[]` contents and order) for success, each error code, and multi-field validation.
+  field-error array contents and order) for success, each error code, and multi-field validation.
 
 ### Development workflow (Docker)
 

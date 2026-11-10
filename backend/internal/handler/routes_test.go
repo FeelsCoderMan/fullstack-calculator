@@ -25,9 +25,10 @@ var ginParam = regexp.MustCompile(`:([A-Za-z0-9_]+)`)
 // registered API route must be documented, and every documented operation must
 // be registered.
 func TestRoutesMatchSpec(t *testing.T) {
-	engine, ok := NewRouter(discardLogger()).(*gin.Engine)
+	router := newTestRouter()
+	engine, ok := router.(*gin.Engine)
 	if !ok {
-		t.Fatalf("NewRouter() = %T, want *gin.Engine", NewRouter(discardLogger()))
+		t.Fatalf("NewRouter() = %T, want *gin.Engine", router)
 	}
 
 	var registered []string
@@ -71,6 +72,13 @@ func TestRouterFallbacks(t *testing.T) {
 			name:       "wrong method on a known path",
 			method:     http.MethodPost,
 			path:       "/health",
+			wantStatus: http.StatusMethodNotAllowed,
+			wantBody:   `{"code":"error.request.method.not.allowed"}`,
+		},
+		{
+			name:       "GET on an operation",
+			method:     http.MethodGet,
+			path:       "/api/v1/add",
 			wantStatus: http.StatusMethodNotAllowed,
 			wantBody:   `{"code":"error.request.method.not.allowed"}`,
 		},

@@ -8,14 +8,15 @@ import (
 	"fullstack-calculator/backend/internal/apperror"
 )
 
-// errorResponse is the body of every error response: a code only, plus the
-// per-field problems for a validation error. Never a message (AGENTS.md
-// Decision 2); the frontend maps codes to text.
+// errorResponse is the body of every error response except validation errors:
+// a code only, never a message (AGENTS.md Decision 2); the frontend maps codes
+// to text.
 type errorResponse struct {
-	Code   apperror.Code        `json:"code"`
-	Errors []fieldErrorResponse `json:"errors,omitempty"`
+	Code apperror.Code `json:"code"`
 }
 
+// fieldErrorResponse is one entry of a validation error body, which is a bare
+// array of them (api/openapi.yaml ValidationErrorResponse).
 type fieldErrorResponse struct {
 	Field string        `json:"field"`
 	Code  apperror.Code `json:"code"`
@@ -31,11 +32,11 @@ type failure struct {
 }
 
 // codeStatus is the single place that maps error codes to HTTP status codes.
-// Rule of thumb: 400 = request shape is wrong, 422 = shape is fine but the
-// math is invalid.
+// Rule of thumb: 400 = the body can't be read as a JSON object, 422 = it can
+// be read, but a field or the math is invalid.
 var codeStatus = map[apperror.Code]int{
 	apperror.CodeRequestInvalidJSON:          http.StatusBadRequest,
-	apperror.CodeValidationFailed:            http.StatusBadRequest,
+	apperror.CodeValidationFailed:            http.StatusUnprocessableEntity,
 	apperror.CodeRequestNotFound:             http.StatusNotFound,
 	apperror.CodeRequestMethodNotAllowed:     http.StatusMethodNotAllowed,
 	apperror.CodeRequestBodyTooLarge:         http.StatusRequestEntityTooLarge,
@@ -62,19 +63,28 @@ func statusFor(code apperror.Code) int {
 func writeError(c *gin.Context, err error) {
 	appErr := apperror.From(err)
 	code := appErr.Code
-	if statusFor(code) == http.StatusInternalServerError {
+	switch {
+	case statusFor(code) == http.StatusInternalServerError:
 		code = apperror.CodeInternal // never reveal more than "internal" for a 5xx
+	case code == apperror.CodeValidationFailed && len(appErr.Fields) == 0:
+		code = apperror.CodeInternal // a bug: an empty array would tell the client nothing
 	}
 	c.Set(contextKeyFailure, failure{err: err, appErr: appErr, code: code})
-	c.AbortWithStatusJSON(statusFor(code), newErrorResponse(code, appErr.Fields))
+	c.AbortWithStatusJSON(statusFor(code), errorBody(code, appErr.Fields))
 }
 
-func newErrorResponse(code apperror.Code, fields []apperror.FieldError) errorResponse {
-	resp := errorResponse{Code: code}
-	for _, f := range fields {
-		resp.Errors = append(resp.Errors, fieldErrorResponse{Field: f.Field, Code: f.Code})
+// errorBody builds the response body for code: the bare array of field errors
+// for a validation error, {"code": ...} for everything else. It returns any
+// because the two bodies are different JSON types (array and object).
+func errorBody(code apperror.Code, fields []apperror.FieldError) any {
+	if code != apperror.CodeValidationFailed {
+		return errorResponse{Code: code}
 	}
-	return resp
+	body := make([]fieldErrorResponse, 0, len(fields))
+	for _, f := range fields {
+		body = append(body, fieldErrorResponse{Field: f.Field, Code: f.Code})
+	}
+	return body
 }
 
 // recordedFailure returns the failure writeError recorded for this request.

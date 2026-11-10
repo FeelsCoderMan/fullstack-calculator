@@ -15,7 +15,6 @@ type Code string
 // Top-level codes: the "code" of an error response.
 const (
 	CodeRequestInvalidJSON          Code = "error.request.invalid.json"
-	CodeValidationFailed            Code = "error.validation.failed"
 	CodeRequestNotFound             Code = "error.request.not.found"
 	CodeRequestMethodNotAllowed     Code = "error.request.method.not.allowed"
 	CodeRequestBodyTooLarge         Code = "error.request.body.too.large"
@@ -27,6 +26,12 @@ const (
 	CodeInternal                    Code = "error.internal"
 )
 
+// CodeValidationFailed marks an Error that carries field errors. It is
+// internal: it selects the 422 status and appears as the "code" of the request
+// log record, but it is never sent. The response body is the bare array of
+// field errors (api/openapi.yaml ValidationErrorResponse).
+const CodeValidationFailed Code = "error.validation.failed"
+
 // Field-level codes: the "code" of an entry in a validation error's "errors".
 const (
 	CodeFieldRequired    Code = "error.field.required"
@@ -35,11 +40,11 @@ const (
 	CodeFieldUnknown     Code = "error.field.unknown"
 )
 
-// Codes returns every top-level code, in catalog order.
+// Codes returns every top-level code sent to clients, in catalog order. It
+// excludes the internal CodeValidationFailed.
 func Codes() []Code {
 	return []Code{
 		CodeRequestInvalidJSON,
-		CodeValidationFailed,
 		CodeRequestNotFound,
 		CodeRequestMethodNotAllowed,
 		CodeRequestBodyTooLarge,

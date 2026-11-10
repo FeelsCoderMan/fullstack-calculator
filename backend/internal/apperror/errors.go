@@ -13,7 +13,8 @@ import (
 // created. Error text is developer context and is never sent to clients.
 type Error struct {
 	Code Code
-	// Fields lists per-field problems; set only for CodeValidationFailed.
+	// Fields lists per-field problems; set only for CodeValidationFailed,
+	// whose response body is this list.
 	Fields []FieldError
 
 	cause error

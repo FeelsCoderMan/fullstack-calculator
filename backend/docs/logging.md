@@ -163,7 +163,9 @@ container. Set it back to `info` afterwards.
 - **`Internal(err)`** is for unexpected failures. It wraps `err` as `error.internal` and
   **captures the stack at the call site**. Call it where the unexpected error is first
   seen, so the stack points at the real origin.
-- **`Validation(fields...)`** builds `error.validation.failed` with per-field codes.
+- **`Validation(fields...)`** builds `error.validation.failed` with per-field codes. That
+  code is internal: it sets the 422 status and the log record's `code`, but the response
+  body is only the array of field errors.
 - **`Panic(v)`** builds `error.internal` from a recovered panic value, with the stack of
   the panic.
 - **`From(err)`** finds the `*Error` in the chain (`errors.As`). If there is none, the error
@@ -179,9 +181,9 @@ place. `apperror` knows nothing about HTTP.
 
 ## 8. Responses
 
-- **Error body:** `{"code": "<code>"}`, plus `"errors": [{"field": "...", "code": "..."}]`
-  for `error.validation.failed`. No messages, no stack and no cause text. A 500 always
-  answers just `{"code":"error.internal"}`.
+- **Error body:** `{"code": "<code>"}`, except for a validation error (422), whose body is a
+  bare array `[{"field": "...", "code": "..."}]` with no top-level code. No messages, no
+  stack and no cause text. A 500 always answers just `{"code":"error.internal"}`.
 - The user-friendly message is produced by the **frontend** from `code`, with a generic
   fallback for unknown codes.
 - Every documented response's shape is in `api/openapi.yaml` (`ErrorResponse`,

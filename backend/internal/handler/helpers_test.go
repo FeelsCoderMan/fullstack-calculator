@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"fullstack-calculator/backend/api"
+	"fullstack-calculator/backend/internal/service"
 )
 
 func discardLogger() *slog.Logger {
@@ -44,12 +45,29 @@ func loadSpec(t *testing.T) *openapi3.T {
 	return doc
 }
 
-// serve sends a request through the real router and returns the recorded response.
+// newTestRouter is the real router with the real calculator.
+func newTestRouter() http.Handler {
+	return NewRouter(discardLogger(), service.NewCalculator())
+}
+
+// serve sends a bodiless request through the real router and returns the
+// recorded response.
 func serve(t *testing.T, method, path string) (*http.Request, *httptest.ResponseRecorder) {
 	t.Helper()
 	req := httptest.NewRequestWithContext(t.Context(), method, path, http.NoBody)
 	rec := httptest.NewRecorder()
-	NewRouter(discardLogger()).ServeHTTP(rec, req)
+	newTestRouter().ServeHTTP(rec, req)
+	return req, rec
+}
+
+// serveJSON POSTs body with the given Content-Type through router and returns
+// the recorded response.
+func serveJSON(t *testing.T, router http.Handler, path, contentType, body string) (*http.Request, *httptest.ResponseRecorder) {
+	t.Helper()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
 	return req, rec
 }
 
