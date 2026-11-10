@@ -1276,9 +1276,24 @@ func TestSqrt(t *testing.T) {
 		},
 		{
 			name: "rounds a tie half away from zero",
-			x:    2.25, // 1.5; the service accepts any float64, the whole-number rule is the handler's
+			x:    2.25, // 1.5
 			p:    RoundTo(0),
 			want: 2,
+		},
+		{
+			name: "decimal",
+			x:    1.5,
+			want: 1.224744871391589,
+		},
+		{
+			name: "decimal with an exact root",
+			x:    2.25,
+			want: 1.5,
+		},
+		{
+			name: "decimal below one has a larger root",
+			x:    0.01,
+			want: 0.1,
 		},
 		{
 			name: "zero",
@@ -1327,6 +1342,16 @@ func TestSqrt(t *testing.T) {
 		{
 			name:    "negative whole number",
 			x:       -4,
+			wantErr: apperror.ErrNegativeSquareRoot,
+		},
+		{
+			name:    "negative decimal",
+			x:       -2.5,
+			wantErr: apperror.ErrNegativeSquareRoot,
+		},
+		{
+			name:    "tiny negative subnormal",
+			x:       -1e-320,
 			wantErr: apperror.ErrNegativeSquareRoot,
 		},
 		{

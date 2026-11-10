@@ -127,7 +127,7 @@ embeds it and serves it with Swagger UI:
 | `GET`         | `/swagger/openapi.yaml` | none                                   | the OpenAPI document (YAML)  |
 
 Operands are JSON numbers (float64). `precision` (optional, 0–15) rounds the result half
-away from zero. The `sqrt` `operand` must be a whole number.
+away from zero. The `sqrt` `operand` can be any number ≥ 0, whole or decimal.
 
 ```sh
 curl -s -H 'Content-Type: application/json' -d '{"leftOperand":15,"rightOperand":19.99}' \

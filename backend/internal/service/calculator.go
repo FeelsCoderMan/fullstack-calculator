@@ -133,8 +133,8 @@ func percentOf(a, b float64) float64 {
 // apperror.ErrNegativeSquareRoot when x is negative, checked before computing
 // so it isn't reported as undefined (math.Sqrt returns NaN). -0 is not
 // negative; its root is 0. math.Sqrt is exactly rounded, and a square root
-// can't overflow or underflow. The API accepts only whole numbers for x; that
-// rule is request validation, enforced by the handler.
+// can't overflow or underflow: below 1 the root is larger than x (the root of
+// the smallest float64, 5e-324, is 2.2e-162).
 func (*Calculator) Sqrt(x float64, p Precision) (float64, error) {
 	if x < 0 {
 		return 0, fmt.Errorf("square root of %g: %w", x, apperror.ErrNegativeSquareRoot)

@@ -992,7 +992,7 @@ func TestPercentage(t *testing.T) {
 }
 
 // TestSqrt pins the square root, its one-operand body ({"operand",
-// "precision"?}) and the whole-number rule. The body has its own decoder, so
+// "precision"?}) and its decimal operands. The body has its own decoder, so
 // unlike the two-operand operations its validation is tested here in full.
 func TestSqrt(t *testing.T) {
 	tests := []struct {
@@ -1030,6 +1030,41 @@ func TestSqrt(t *testing.T) {
 			body:        `{"operand":0}`,
 			wantStatus:  http.StatusOK,
 			wantBody:    `{"result":0}`,
+		},
+		{
+			name:        "decimal operand",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1.5}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.224744871391589}`,
+		},
+		{
+			name:        "decimal with an exact root",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":2.25}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.5}`,
+		},
+		{
+			name:        "decimal below one has a larger root",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":0.01}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":0.1}`,
+		},
+		{
+			name:        "decimal rounded to precision",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":1.5,"precision":4}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":1.2247}`,
+		},
+		{
+			name:        "smallest positive float stays in range",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":5e-324}`,
+			wantStatus:  http.StatusOK,
+			wantBody:    `{"result":2.2227587494850775e-162}`,
 		},
 		{
 			name:        "whole number written with a decimal point",
@@ -1076,6 +1111,20 @@ func TestSqrt(t *testing.T) {
 			wantBody:    `{"code":"error.calculation.negative.square.root"}`,
 		},
 		{
+			name:        "negative decimal",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":-2.5}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.negative.square.root"}`,
+		},
+		{
+			name:        "tiny negative decimal",
+			contentType: binding.MIMEJSON,
+			body:        `{"operand":-1e-320}`,
+			wantStatus:  http.StatusUnprocessableEntity,
+			wantBody:    `{"code":"error.calculation.negative.square.root"}`,
+		},
+		{
 			name:        "negative whole number with precision",
 			contentType: binding.MIMEJSON,
 			body:        `{"operand":-1,"precision":2}`,
@@ -1106,27 +1155,6 @@ func TestSqrt(t *testing.T) {
 			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
 		},
 		{
-			name:        "decimal is not a whole number",
-			contentType: binding.MIMEJSON,
-			body:        `{"operand":2.25}`,
-			wantStatus:  http.StatusUnprocessableEntity,
-			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
-		},
-		{
-			name:        "tiny decimal that survives parsing is not a whole number",
-			contentType: binding.MIMEJSON,
-			body:        `{"operand":1e-320}`,
-			wantStatus:  http.StatusUnprocessableEntity,
-			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
-		},
-		{
-			name:        "negative decimal fails the whole-number rule first",
-			contentType: binding.MIMEJSON,
-			body:        `{"operand":-2.5}`,
-			wantStatus:  http.StatusUnprocessableEntity,
-			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"}]`,
-		},
-		{
 			name:        "operand beyond float64 range",
 			contentType: binding.MIMEJSON,
 			body:        `{"operand":1e309}`,
@@ -1143,7 +1171,7 @@ func TestSqrt(t *testing.T) {
 		{
 			name:        "every problem at once in a fixed order",
 			contentType: binding.MIMEJSON,
-			body:        `{"zeta":1,"precision":16,"operand":2.5,"alpha":1}`,
+			body:        `{"zeta":1,"precision":16,"operand":"2.5","alpha":1}`,
 			wantStatus:  http.StatusUnprocessableEntity,
 			wantBody:    `[{"field":"operand","code":"error.field.invalid.type"},{"field":"precision","code":"error.field.out.of.range"},{"field":"alpha","code":"error.field.unknown"},{"field":"zeta","code":"error.field.unknown"}]`,
 		},

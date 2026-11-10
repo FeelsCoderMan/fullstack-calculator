@@ -274,22 +274,21 @@ paths:
     post:
       tags: [calculator]
       operationId: sqrt
-      summary: Square root of a whole number
+      summary: Square root of a number
       description: |
         Returns the square root of `operand`, optionally rounded to `precision`
         decimal places.
-        - `operand` must be a whole number (`2.0` and `1e20` count; `2.25` is
-          422 `error.field.invalid.type`).
-        - A negative `operand` is 422 `error.calculation.negative.square.root`,
-          checked before computing. A negative decimal (`-2.5`) fails the
-          whole-number rule first.
-        - `0` and `-0` give `0`. The whole-number rule is checked after parsing:
-          an operand that underflows to `0` on input (`1e-400`) gives `0`,
-          while a tiny decimal float64 can still hold (`1e-320`) is
-          `error.field.invalid.type`.
+        - `operand` is any number ≥ 0, whole or decimal (`1.5` gives
+          `1.224744871391589`, `2.25` gives `1.5`).
+        - A negative `operand` (`-4`, `-2.5`, `-1e-320`) is
+          422 `error.calculation.negative.square.root`, checked before
+          computing.
+        - `0` and `-0` give `0`; an operand that underflows to `0` on input
+          (`1e-400`, `-1e-400`) gives `0`.
         - Before any `precision` rounding, the result is exactly rounded
-          (IEEE 754) and can neither overflow nor underflow: the square root of the largest float64 is
-          `1.3407807929942596e154`. Integers above 2^53 are read inexactly
+          (IEEE 754) and can neither overflow nor underflow: the square root of
+          the largest float64 is `1.3407807929942596e154`, and of the smallest
+          positive float64 (`5e-324`) it is `2.2227587494850775e-162`. Integers above 2^53 are read inexactly
           (`9007199254740993` is `9007199254740992`).
       requestBody:
         required: true
@@ -298,7 +297,7 @@ paths:
             schema:
               $ref: "#/components/schemas/UnaryOperationRequest"
             example:
-              operand: 16
+              operand: 1.5
       responses:
         "200":
           $ref: "#/components/responses/Result"
@@ -484,8 +483,7 @@ components:
       description: |
         Problem with a single request field.
         - `error.field.required`: missing or `null`
-        - `error.field.invalid.type`: not a JSON number (for `precision` and the
-          `sqrt` `operand`: not an integer)
+        - `error.field.invalid.type`: not a JSON number (for `precision`: not an integer)
         - `error.field.out.of.range`: not representable as a 64-bit float (for
           `precision`: outside 0-15)
         - `error.field.unknown`: property not expected in the body
@@ -544,10 +542,11 @@ components:
       properties:
         operand:
           description: |
-            A whole number. Negative values pass validation and fail the math
-            (`error.calculation.negative.square.root`).
-          type: integer
-          example: 16
+            Any number in the float64 range; the math needs a number ≥ 0.
+            Negative values pass validation and fail with
+            `error.calculation.negative.square.root`.
+          type: number
+          example: 1.5
         precision:
           description: |
             Decimal places to round the result to. Omit it (or send `null`) for
