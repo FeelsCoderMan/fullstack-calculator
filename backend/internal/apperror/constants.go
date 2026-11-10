@@ -9,12 +9,5 @@ const (
 	skipToCaller = 3
 )
 
-// Format strings.
-const (
-	errorWithCauseFormat = "%s: %v"
-	stackFrameFormat     = "%s %s:%d"
-	panicFormat          = "%w: %v"
-)
-
 // importPathSeparator separates the elements of a Go import path.
 const importPathSeparator = "/"

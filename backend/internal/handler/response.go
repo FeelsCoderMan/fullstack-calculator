@@ -42,6 +42,7 @@ var codeStatus = map[apperror.Code]int{
 	apperror.CodeRequestBodyTooLarge:         http.StatusRequestEntityTooLarge,
 	apperror.CodeRequestUnsupportedMediaType: http.StatusUnsupportedMediaType,
 	apperror.CodeDivisionByZero:              http.StatusUnprocessableEntity,
+	apperror.CodeZeroNegativePower:           http.StatusUnprocessableEntity,
 	apperror.CodeNegativeSquareRoot:          http.StatusUnprocessableEntity,
 	apperror.CodeResultOverflow:              http.StatusUnprocessableEntity,
 	apperror.CodeResultUndefined:             http.StatusUnprocessableEntity,

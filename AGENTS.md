@@ -53,8 +53,7 @@ references the name or calls a helper that builds the value.
     `const CodeDivisionByZero Code = "error.calculation.division.by.zero"`, or
     `type Category string`.
   - Use an untyped `const` block for one-off values: env var names, defaults, routes and
-    paths, header names and values, log messages, log attribute keys, and non-error format
-    strings (`addrFormat = ":%d"`).
+    paths, header names and values, log messages, and log attribute keys.
   - Use helpers for derived values, e.g. `logger.FileName(category, t)`.
   - **Error text is not enumerated.** Messages passed to `fmt.Errorf` are written inline
     at the call site, e.g. `fmt.Errorf("listen on %s: %w", addr, err)`. They are developer
@@ -66,7 +65,9 @@ references the name or calls a helper that builds the value.
     from the generated OpenAPI types, CSS class names, storage keys.
   - User-facing text comes **only** from `src/i18n`.
 - **Allowed exceptions**:
-  - format strings and messages inside `fmt.Errorf(...)`
+  - format strings written directly in a `fmt` formatting call (`fmt.Errorf`, `fmt.Sprintf`),
+    e.g. `fmt.Sprintf("%s %s:%d", fn, file, line)`. A format string is most readable next to
+    its arguments; a constant may still be used when it is reused or names a contract.
   - struct tags (`json:"a"`)
   - the empty string `""` as a zero-value check (`if v != ""`)
   - test files asserting **exact wire output** (expected JSON bodies, status payloads). The
@@ -188,15 +189,16 @@ fallback for unknown codes.
 | `error.request.invalid.json`             | 400  | body is not valid JSON / not a JSON object        |
 | `error.validation.failed`                | 422  | internal only: body is the bare field-error array  |
 | `error.field.required`                   | —    | field-level: operand missing or `null`             |
-| `error.field.invalid.type`               | —    | field-level: not a JSON number (`precision`: not an integer) |
+| `error.field.invalid.type`               | —    | field-level: not a JSON number (`precision`, `sqrt` `operand`: not an integer) |
 | `error.field.out.of.range`               | —    | field-level: not representable as float64 (`precision`: outside 0–15) |
 | `error.field.unknown`                    | —    | field-level: unexpected property in body           |
 | `error.request.not.found`                | 404  | unknown route                                      |
 | `error.request.method.not.allowed`       | 405  | wrong HTTP method                                  |
 | `error.request.body.too.large`           | 413  | body exceeds limit (1 MiB)                         |
 | `error.request.unsupported.media.type`   | 415  | `Content-Type` not `application/json`              |
-| `error.calculation.division.by.zero`     | 422  | `divide` with `b == 0`                             |
-| `error.calculation.negative.square.root` | 422  | `sqrt` with `a < 0`                                |
+| `error.calculation.division.by.zero`     | 422  | `divide` with `rightOperand` 0 (or `-0`, or one that underflows to 0 like `1e-400`), checked before dividing |
+| `error.calculation.zero.negative.power`  | 422  | `power` with base 0 (or `-0`) and a negative exponent (`1 / 0`) |
+| `error.calculation.negative.square.root` | 422  | `sqrt` with a negative `operand`, checked before computing |
 | `error.calculation.result.overflow`      | 422  | result is ±Inf                                     |
 | `error.calculation.result.undefined`     | 422  | result is NaN (e.g. `power(-8, 0.5)`)              |
 | `error.internal`                         | 500  | unexpected failure (details only in server logs)   |
@@ -215,7 +217,9 @@ shapes) are in [`backend/docs/operations.md`](backend/docs/operations.md).
 Two-operand operations take `{"leftOperand": number, "rightOperand": number, "precision"?:
 integer 0–15}` (shown as `L`, `R` below). `precision` rounds the result half away from
 zero; omitted or `null` means the full float64 result. Results are always finite and never
-`-0`. Implemented so far: `add`, `subtract`. `sqrt` gets its own request shape, designed separately.
+`-0`. `sqrt` takes one operand instead: `{"operand": integer, "precision"?: integer 0–15}`, where
+`operand` must be a whole number (a decimal is `error.field.invalid.type`). Implemented so
+far: all of them (`add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`, `percentage`).
 
 | Method | Path                    | Body                          | Result                 |
 |--------|-------------------------|-------------------------------|------------------------|
@@ -224,7 +228,7 @@ zero; omitted or `null` means the full float64 result. Results are always finite
 | POST   | `/api/v1/multiply`      | `{L, R, precision?}`          | `L * R`                |
 | POST   | `/api/v1/divide`        | `{L, R, precision?}`          | `L / R`                |
 | POST   | `/api/v1/power`         | `{L, R, precision?}`          | `L ^ R`                |
-| POST   | `/api/v1/sqrt`          | to be designed                | `√x`                   |
+| POST   | `/api/v1/sqrt`          | `{operand, precision?}`       | `√operand`             |
 | POST   | `/api/v1/percentage`    | `{L, R, precision?}`          | `L` percent of `R`     |
 | GET, HEAD | `/health`           | none                          | `204`, no body         |
 | GET    | `/swagger/`             | none                          | Swagger UI             |

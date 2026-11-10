@@ -3,9 +3,9 @@
 A Go REST service for the full-stack calculator. It uses [gin](https://github.com/gin-gonic/gin)
 for routing, `log/slog` for structured JSON logs, and shuts down gracefully on SIGINT/SIGTERM.
 
-> **Status:** the server, configuration, logging, health check, Docker setup and the
-> OpenAPI spec with Swagger UI are in place. The calculator endpoints (`/api/v1/...`) are
-> not implemented yet.
+> **Status:** complete. The server, configuration, logging, health check, Docker setup,
+> the OpenAPI spec with Swagger UI, and all calculator endpoints (`add`, `subtract`,
+> `multiply`, `divide`, `power`, `sqrt`, `percentage`) are in place.
 
 ## Requirements
 
@@ -113,15 +113,51 @@ embeds it and serves it with Swagger UI:
 - **Swagger UI:** <http://localhost:8080/swagger/>
 - **Raw spec:** <http://localhost:8080/swagger/openapi.yaml>, which the frontend uses to generate its types
 
-| Method        | Path                    | Response                         |
-|---------------|-------------------------|----------------------------------|
-| `GET`, `HEAD` | `/health`               | `204 No Content`, no body        |
-| `GET`         | `/swagger/`             | Swagger UI (HTML)                |
-| `GET`         | `/swagger/openapi.yaml` | the OpenAPI document (YAML)      |
+| Method        | Path                    | Body                                   | Response                     |
+|---------------|-------------------------|----------------------------------------|------------------------------|
+| `POST`        | `/api/v1/add`           | `{"leftOperand", "rightOperand", "precision"?}` | `{"result"}`: L + R |
+| `POST`        | `/api/v1/subtract`      | same                                   | `{"result"}`: L − R          |
+| `POST`        | `/api/v1/multiply`      | same                                   | `{"result"}`: L × R          |
+| `POST`        | `/api/v1/divide`        | same                                   | `{"result"}`: L ÷ R          |
+| `POST`        | `/api/v1/power`         | same                                   | `{"result"}`: L ^ R          |
+| `POST`        | `/api/v1/percentage`    | same                                   | `{"result"}`: L% of R = L × R / 100 |
+| `POST`        | `/api/v1/sqrt`          | `{"operand", "precision"?}`            | `{"result"}`: √operand       |
+| `GET`, `HEAD` | `/health`               | none                                   | `204 No Content`, no body    |
+| `GET`         | `/swagger/`             | none                                   | Swagger UI (HTML)            |
+| `GET`         | `/swagger/openapi.yaml` | none                                   | the OpenAPI document (YAML)  |
 
-Errors are JSON with a code only, e.g. unknown routes answer `404 {"code":"error.request.not.found"}`
-and a wrong method `405 {"code":"error.request.method.not.allowed"}`. Every response carries an
-`X-Request-ID` header (reused from the request if it's well formed, otherwise generated).
+Operands are JSON numbers (float64). `precision` (optional, 0–15) rounds the result half
+away from zero. The `sqrt` `operand` must be a whole number.
+
+```sh
+curl -s -H 'Content-Type: application/json' -d '{"leftOperand":15,"rightOperand":19.99}' \
+  http://localhost:8080/api/v1/percentage
+# {"result":2.9985}
+
+curl -s -H 'Content-Type: application/json' -d '{"leftOperand":1,"rightOperand":0}' \
+  http://localhost:8080/api/v1/divide
+# {"code":"error.calculation.division.by.zero"}   (422)
+
+curl -s -H 'Content-Type: application/json' -d '{"leftOperand":"x"}' \
+  http://localhost:8080/api/v1/add
+# [{"field":"leftOperand","code":"error.field.invalid.type"},
+#  {"field":"rightOperand","code":"error.field.required"}]   (422)
+```
+
+Responses carry data or codes, never messages:
+
+- **Success:** `{"result": number}`, always finite and never `-0`.
+- **400** `{"code":"error.request.invalid.json"}`: the body isn't a JSON object.
+- **422 field errors:** a bare array of `{"field", "code"}`, every invalid field at once.
+- **422 math errors:** `{"code"}`: `division.by.zero`, `zero.negative.power`,
+  `negative.square.root`, `result.overflow` or `result.undefined` (each prefixed
+  `error.calculation.`).
+- **404/405/413/415/500:** `{"code"}`, e.g. unknown routes answer
+  `404 {"code":"error.request.not.found"}`.
+
+Every response carries an `X-Request-ID` header (reused from the request if it's well
+formed, otherwise generated). The float64 limits (overflow, underflow, precision, rounding)
+and the reasoning behind each operation are in [`docs/operations.md`](docs/operations.md).
 
 ### Adding an endpoint
 
@@ -221,10 +257,12 @@ backend/
 ├── cmd/server/          # main: server.NewApp() then app.Run(), logs any error, exits 1
 ├── api/                 # openapi.yaml (the contract) + swagger.html, embedded into the binary
 ├── docs/logging.md      # logging + error handling spec
+├── docs/operations.md   # operation design: number type, limits, rounding, per-operation notes
 ├── internal/
 │   ├── apperror/        # error codes, sentinels, Internal/Validation/Panic, stack capture
 │   ├── server/          # App: loads config, sets up logging, listens, graceful shutdown
-│   ├── handler/         # HTTP layer (gin): routes, handlers, access-log middleware
+│   ├── handler/         # HTTP layer (gin): routes, request decoding/validation, handlers, access-log middleware
+│   ├── service/         # business logic: Calculator (the operations), result checks, rounding
 │   ├── config/          # env loading: config.LoadServer, config.LoadLog
 │   └── logger/          # slog setup, categories, typed attributes, dev file output
 ├── .env.example         # config template (copy to .env)

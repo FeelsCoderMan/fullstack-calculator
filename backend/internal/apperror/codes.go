@@ -20,6 +20,7 @@ const (
 	CodeRequestBodyTooLarge         Code = "error.request.body.too.large"
 	CodeRequestUnsupportedMediaType Code = "error.request.unsupported.media.type"
 	CodeDivisionByZero              Code = "error.calculation.division.by.zero"
+	CodeZeroNegativePower           Code = "error.calculation.zero.negative.power"
 	CodeNegativeSquareRoot          Code = "error.calculation.negative.square.root"
 	CodeResultOverflow              Code = "error.calculation.result.overflow"
 	CodeResultUndefined             Code = "error.calculation.result.undefined"
@@ -50,6 +51,7 @@ func Codes() []Code {
 		CodeRequestBodyTooLarge,
 		CodeRequestUnsupportedMediaType,
 		CodeDivisionByZero,
+		CodeZeroNegativePower,
 		CodeNegativeSquareRoot,
 		CodeResultOverflow,
 		CodeResultUndefined,
