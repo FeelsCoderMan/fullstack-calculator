@@ -123,7 +123,7 @@ Each package keeps its declarations in two dedicated files, the same way a domai
     └── src/
         ├── api/              # typed API client + generated OpenAPI types
         ├── i18n/             # code → message mapping (success + error texts)
-        ├── components/       # presentational components
+        ├── components/       # one folder per component: calculator/Calculator.tsx + Calculator.module.css (+ test)
         ├── hooks/            # stateful logic (e.g. useCalculator)
         └── utils/            # validation helpers
 ```
@@ -472,6 +472,10 @@ so they never appear in `go.mod` or the image. Upgrade one with
 Starts only after the backend is done (Decision 1).
 
 - Vite, React, TypeScript with `strict: true`. No `any` without a comment justifying it.
+- **One folder per component.** A component lives in `src/components/<kebab-name>/` together
+  with its CSS module and its test: `calculator/Calculator.tsx`, `calculator/Calculator.module.css`,
+  `calculator/Calculator.test.tsx`. No barrel `index.ts` files; import the file itself
+  (`@/components/calculator/Calculator`).
 - **Absolute imports only.** `@` is an alias for `frontend/src`: write
   `import { calculate } from '@/api/client'`, never `'./client'` or `'../api/client'`. The
   same goes for CSS modules, `vi.mock(...)` and `import('...')` type imports. The alias is

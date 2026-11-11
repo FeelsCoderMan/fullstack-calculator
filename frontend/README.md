@@ -232,8 +232,12 @@ Accessibility:
   typed outcome (`success` / `fieldErrors` / `failure`) and never throws for HTTP or network
   errors.
 - **Strict TypeScript** (`strict`, `noUncheckedIndexedAccess`), no `any`.
+- **One folder per component.** Each component sits in `src/components/<kebab-name>/` with
+  its CSS Module and its test (`calculator/Calculator.tsx`, `Calculator.module.css`,
+  `Calculator.test.tsx`), so everything about one component is in one place. There are no
+  barrel `index.ts` files: imports name the file (`@/components/calculator/Calculator`).
 - **Absolute imports.** `@` points to `src/`, so every import is written from there:
-  `import { calculate } from '@/api/client'`, `import styles from '@/components/Field.module.css'`.
+  `import { calculate } from '@/api/client'`, `import styles from '@/components/field/Field.module.css'`.
   Relative imports (`./`, `../`) are a lint error. The alias is defined twice and must stay
   in sync: `paths` in `tsconfig.app.json` (for the type checker) and `resolve.alias` in
   `vite.config.ts` (for Vite and Vitest).
@@ -256,7 +260,11 @@ frontend/
 │   │   └── client.ts         # calculate(): fetch + response classification
 │   ├── i18n/                 # every user-facing text, code → message lookups
 │   ├── hooks/useCalculator.ts # form state, validation, request lifecycle, result carry-over
-│   ├── components/           # Calculator, OperationPicker, Field, ResultDisplay (+ CSS Modules)
+│   ├── components/           # one folder per component: the .tsx, its CSS Module and its test
+│   │   ├── calculator/       # Calculator.tsx, Calculator.module.css, Calculator.test.tsx
+│   │   ├── field/            # Field.tsx, Field.module.css
+│   │   ├── operation-picker/ # OperationPicker.tsx, OperationPicker.module.css
+│   │   └── result-display/   # ResultDisplay.tsx, ResultDisplay.module.css
 │   ├── utils/                # input validation, class name / aria id helpers
 │   ├── test/setup.ts         # jest-dom matchers, cleanup between tests
 │   ├── App.tsx               # page shell: header, calculator, footer link to Swagger UI

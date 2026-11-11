@@ -16,7 +16,7 @@
       {
         "patterns": [
           {
-            "group": ["./*", "./**", "../*", "../**"],
+            "group": [".", "..", "./*", "./**", "../*", "../**"],
             "message": "Import from src/ with the @ alias, e.g. '@/api/client'."
           }
         ]

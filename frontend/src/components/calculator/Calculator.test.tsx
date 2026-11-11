@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { calculate, type CalculationOutcome } from '@/api/client'
-import { Calculator } from '@/components/Calculator'
+import { Calculator } from '@/components/calculator/Calculator'
 
 vi.mock('@/api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/client')>()

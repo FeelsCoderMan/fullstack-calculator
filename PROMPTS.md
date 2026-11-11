@@ -549,3 +549,13 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **83.** Confirming the absolute-imports commit:
 
 > yes, commit it
+
+**84.**
+
+> Second refactoring is to group the templates with their css file. Currently, they are
+> separated and I would like them to be in same folder. For example, Calculator.tsx and
+> Calculator.module.css should be in calculator/ folder. Apply the refactorization.
+
+**85.** Confirming the component-folders commit:
+
+> yes, commit it

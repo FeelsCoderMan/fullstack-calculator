@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { arityOf, Arity } from '@/api/operations'
 import { StatusKind, type Status } from '@/hooks/useCalculator'
 import { errorMessage, formatNumber, operationText, t } from '@/i18n'
-import styles from '@/components/ResultDisplay.module.css'
+import styles from '@/components/result-display/ResultDisplay.module.css'
 
 interface ResultDisplayProps {
   status: Status

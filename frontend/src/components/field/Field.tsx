@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from 'react'
 import { fieldErrorMessage } from '@/i18n'
 import { errorId, hintId, idRefs } from '@/utils/dom'
-import styles from '@/components/Field.module.css'
+import styles from '@/components/field/Field.module.css'
 
 /** Accessibility props a field passes to its control. */
 export interface ControlProps {
