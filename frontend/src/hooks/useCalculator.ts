@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { calculate, isAbortError, OutcomeKind } from '@/api/client'
+import { calculate, type CalculationOutcome, failure, isAbortError, OutcomeKind } from '@/api/client'
 import { ClientErrorCode, Operation } from '@/api/constants'
 import { Arity, arityOf, buildRequest, InputField, inputForField, inputsOf, type Operands } from '@/api/operations'
 import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from '@/utils/validation'
@@ -72,16 +72,20 @@ export function useCalculator() {
 
   useEffect(() => cancel, [cancel])
 
+  // Keeps the last result on screen (and out of the live region's way); only a
+  // cancelled request must leave the loading state.
+  const leaveLoading = useCallback(() => {
+    setStatus((prev) => (prev.kind === StatusKind.Loading ? IDLE : prev))
+  }, [])
+
   const setOperation = useCallback(
     (next: Operation) => {
       cancel()
       setOperationState(next)
       setFieldErrors({})
-      // Keep the last result visible while the next operation is chosen; only a
-      // cancelled request must leave the loading state.
-      setStatus((prev) => (prev.kind === StatusKind.Loading ? IDLE : prev))
+      leaveLoading()
     },
-    [cancel],
+    [cancel, leaveLoading],
   )
 
   const setValue = useCallback((input: InputField, value: string) => {
@@ -113,29 +117,27 @@ export function useCalculator() {
    * a field error, the input for the next operand after a success, or `null`.
    */
   const submit = useCallback(async (): Promise<InputField | null> => {
+    // A new submit always replaces the request in flight, valid or not.
+    cancel()
     const clientErrors = validateForm(operation, values)
     if (Object.keys(clientErrors).length > 0) {
-      cancel()
       setFieldErrors(clientErrors)
-      // Keep the previous result on screen (and out of the live region's way); only a
-      // cancelled request must leave the loading state.
-      setStatus((prev) => (prev.kind === StatusKind.Loading ? IDLE : prev))
+      leaveLoading()
       return firstInvalidInput(operation, clientErrors)
     }
 
-    cancel()
     const controller = new AbortController()
     inFlight.current = controller
     const operands = toOperands(operation, values)
     setFieldErrors({})
     setStatus({ kind: StatusKind.Loading })
 
-    let outcome
+    let outcome: CalculationOutcome
     try {
       outcome = await calculate(operation, buildRequest(operation, operands), controller.signal)
     } catch (err) {
       if (isAbortError(err)) return null
-      outcome = { kind: OutcomeKind.Failure, code: ClientErrorCode.UnexpectedResponse, requestId: null } as const
+      outcome = failure(ClientErrorCode.UnexpectedResponse, null)
     }
     if (controller.signal.aborted) return null
     inFlight.current = null
@@ -173,7 +175,7 @@ export function useCalculator() {
         setStatus({ kind: StatusKind.Failure, code: outcome.code, requestId: outcome.requestId })
         return null
     }
-  }, [cancel, operation, values])
+  }, [cancel, leaveLoading, operation, values])
 
   return { operation, values, fieldErrors, status, setOperation, setValue, reset, submit }
 }

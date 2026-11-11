@@ -78,7 +78,8 @@ export async function calculate(
   return failure(ClientErrorCode.UnexpectedResponse, requestId)
 }
 
-function failure(code: string, requestId: string | null): CalculationOutcome {
+/** A failed outcome with `code`, as `calculate` returns it. */
+export function failure(code: string, requestId: string | null): CalculationOutcome {
   return { kind: OutcomeKind.Failure, code, requestId }
 }
 

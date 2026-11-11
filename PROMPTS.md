@@ -575,3 +575,7 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **87.** After reviewing the audit tables:
 
 > yes, commit the agent, then fix B3, B5, F1, F9
+
+**88.** Confirming the two fix commits (B3+B5, then F1+F9):
+
+> yes, commit them separately

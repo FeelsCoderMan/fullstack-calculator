@@ -1,4 +1,10 @@
-import type { ErrorCode as ErrorCodeValue, FieldErrorCode as FieldErrorCodeValue } from '@/api/types'
+import type { paths } from '@/api/schema.gen'
+import type {
+  BinaryOperationRequest,
+  ErrorCode as ErrorCodeValue,
+  FieldErrorCode as FieldErrorCodeValue,
+  UnaryOperationRequest,
+} from '@/api/types'
 
 /** Calculator operations offered by the UI, one backend endpoint each. */
 export const Operation = {
@@ -15,7 +21,10 @@ export type Operation = (typeof Operation)[keyof typeof Operation]
 /** Operations in display order. */
 export const OPERATIONS: readonly Operation[] = Object.values(Operation)
 
-/** Endpoint of each operation (`POST`). */
+/**
+ * Endpoint of each operation (`POST`). Checked against the generated spec types, so
+ * a path renamed in openapi.yaml is a compile error after `npm run gen:api`.
+ */
 export const ApiPath = {
   [Operation.Add]: '/api/v1/add',
   [Operation.Subtract]: '/api/v1/subtract',
@@ -24,18 +33,21 @@ export const ApiPath = {
   [Operation.Power]: '/api/v1/power',
   [Operation.Sqrt]: '/api/v1/sqrt',
   [Operation.Percentage]: '/api/v1/percentage',
-} as const satisfies Record<Operation, string>
+} as const satisfies Record<Operation, keyof paths>
 
 /** Swagger UI page served by the backend (proxied in dev and in Docker). */
 export const SWAGGER_PATH = '/swagger/'
 
-/** JSON property names of the request bodies, as reported in field errors. */
+/**
+ * JSON property names of the request bodies, as reported in field errors. Checked
+ * against the generated request types, like `ApiPath`.
+ */
 export const RequestField = {
   LeftOperand: 'leftOperand',
   RightOperand: 'rightOperand',
   Operand: 'operand',
   Precision: 'precision',
-} as const
+} as const satisfies Record<string, keyof BinaryOperationRequest | keyof UnaryOperationRequest>
 export type RequestField = (typeof RequestField)[keyof typeof RequestField]
 
 /** Top-level error codes of the API (the spec's `ErrorCode` enum). */
