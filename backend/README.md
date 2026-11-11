@@ -175,7 +175,7 @@ hashes, so the browser needs internet access. The API itself does not.
 ## Logging
 
 The full spec is in [`docs/logging.md`](docs/logging.md). The server writes one JSON object
-per line to **stdout**, ready for Grafana Loki. Every record carries `service` and `logger`
+per line to **stdout**, ready for any log collector. Every record carries `service` and `logger`
 (`server` or `http`).
 
 **Each request produces exactly one record**, `request completed`, with `method`, `path`,
@@ -196,7 +196,7 @@ twice: handlers don't log errors, they hand them to that record.
 
 To debug a hard-to-reproduce case, set `LOG_LEVEL=debug` in `.env`, run `make up`, then
 set it back. To find one request, search for the `X-Request-ID` value the client
-received: `{service="calculator-backend"} | json | request_id="…"`.
+received, from the project root: `docker compose logs backend | grep '"request_id":"…"'`.
 
 ## Development
 

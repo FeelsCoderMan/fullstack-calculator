@@ -78,7 +78,38 @@ curl -s -H 'Content-Type: application/json' -d '{"leftOperand":1.5,"rightOperand
 
 ## Tests and coverage
 
-Tests run locally, without Docker or `.env`.
+Tests run locally, without Docker or `.env` (Go and Node.js, see
+[Requirements](#requirements)). From the project root, one command runs both parts:
+
+```sh
+make test       # unit tests of both parts: backend (race detector, per-package coverage), then frontend
+make coverage   # both suites with coverage, printing both reports and writing the HTML versions
+```
+
+`make coverage` prints the backend's coverage per package and in total, then the frontend's
+per-file table (statements, branches, functions, lines, uncovered lines), and ends with the
+paths of the HTML reports:
+
+```
+==> backend coverage
+ok   fullstack-calculator/backend/internal/handler   coverage: 95.7% of statements
+…
+total:                                  (statements)   94.6%
+==> frontend coverage
+ Test Files  6 passed (6)
+      Tests  157 passed (157)
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+All files          |   98.36 |    98.38 |    98.7 |   98.64 |
+…
+==> HTML reports: backend/coverage.html, frontend/coverage/index.html
+```
+
+Each part also runs on its own: `make test-backend`, `make test-frontend`,
+`make coverage-backend`, `make coverage-frontend`. The frontend targets run `npm ci` first
+when `frontend/node_modules` is missing or older than `package-lock.json`. The parts run one
+after the other, so their output never interleaves.
+
+The same commands from inside each part:
 
 | | Backend (from `backend/`) | Frontend (from `frontend/`) |
 |---|---|---|
@@ -122,7 +153,7 @@ documents every endpoint with examples in [`backend/README.md`](backend/README.m
   [`backend/docs/operations.md`](backend/docs/operations.md).
 - **One origin.** nginx in the frontend image serves the app and proxies `/api` and
   `/swagger` to the backend, so the browser needs no CORS.
-- **Structured logs** for Grafana Loki: one JSON record per request
+- **Structured logs**: one JSON record per request on stdout
   ([`backend/docs/logging.md`](backend/docs/logging.md)).
 
 All agreed conventions and decisions are in [`AGENTS.md`](AGENTS.md).
@@ -131,7 +162,7 @@ All agreed conventions and decisions are in [`AGENTS.md`](AGENTS.md).
 
 ```
 .
-├── Makefile             # make up / down / logs / ps: the whole stack through docker compose
+├── Makefile             # make up / down / logs / ps (whole stack via compose), make test / coverage (both parts)
 ├── docker-compose.yml   # runs backend + frontend together
 ├── backend/             # Go service: API, OpenAPI spec, Swagger UI  → backend/README.md
 ├── frontend/            # React + Vite app, served by nginx in Docker → frontend/README.md

@@ -644,3 +644,19 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **103.** Recording the push prompt itself:
 
 > yes, add it and push
+
+## Session 5 (continued): root test and coverage commands
+
+**104.**
+
+> add make command for project root. It should display unit tests and coverage report running
+> in both backend and frontend parts. Update README.md file too
+
+**105.**
+
+> before the commit, remove the grafana or loki being mentioned in README.md. We will not
+> have time to integrate these tools to the project at the moment.
+
+**106.** Confirming the commit and push (the other Loki mentions, outside the READMEs, stay):
+
+> yes, commit and push

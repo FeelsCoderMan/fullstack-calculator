@@ -98,7 +98,7 @@ Each package keeps its declarations in two dedicated files, the same way a domai
 ├── AGENTS.md                 # this file (CLAUDE.md imports it)
 ├── README.md
 ├── PROMPTS.md                # AI prompts used (assignment deliverable)
-├── Makefile                  # whole stack via docker compose: env, up, down, restart, build, urls, logs, ps
+├── Makefile                  # whole stack via docker compose (env, up, down, urls, logs, ps) + test/coverage of both parts
 ├── docker-compose.yml
 ├── .githooks/pre-commit      # git hook: runs .claude/scripts/verify.sh (make -C backend hooks)
 ├── backend/                  # Go module
@@ -524,7 +524,9 @@ npm run build
 - The root `Makefile` wraps Compose for the whole stack: `make env` (creates `backend/.env`
   once, never overwrites), `make up` (`up --build --detach --wait`, both services), `down`,
   `restart`, `build`, `urls`, `logs`, `logs-backend`, `logs-frontend`, `ps`; `make help`
-  lists them. The Makefile never repeats ports: `urls` asks Compose for each service's
+  lists them. `make test` / `make coverage` (and `-backend` / `-frontend` variants) run both
+  parts' unit tests and coverage reports locally, by calling `make -C backend test|cover` and
+  `npm test` / `npm run coverage`, one part after the other. The Makefile never repeats ports: `urls` asks Compose for each service's
   published port, so `ports:` in `docker-compose.yml` stays the single source.
   `backend/Makefile` stays the backend-only workflow (Go tooling, `make -C backend up` for
   the backend service alone).
