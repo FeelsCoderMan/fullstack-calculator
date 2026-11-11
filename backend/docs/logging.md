@@ -58,7 +58,8 @@ request ─▶ RequestLogger ─▶ (gin routing) ─▶ handler ─▶ service
 ```
 
 `RequestLogger` lives in `internal/middleware`, which must not import `handler`.
-`NewRouter` wires it as `middleware.RequestLogger(accessLog, writeError, pathHealth)`: it
+`newEngine` (used by `NewRouter` and the handler tests) wires it as
+`middleware.RequestLogger(accessLog, writeError, pathHealth)`: it
 gets the handler's `writeError` to answer a recovered panic (so code → status stays mapped
 in one place), and the paths whose successful requests are logged at `debug`.
 

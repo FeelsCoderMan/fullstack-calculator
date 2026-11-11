@@ -587,3 +587,11 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **90.** Confirming the F2–F7 commit:
 
 > yes, commit it
+
+**91.** Picking findings from the quality-reviewer's backend table to fix:
+
+> fix B1, B2, B6
+
+**92.** Confirming the two backend commits (B6 rename, then B1+B2):
+
+> yes, commit them separately

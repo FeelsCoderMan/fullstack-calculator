@@ -46,16 +46,15 @@ func onlyRecord(t *testing.T, buf *bytes.Buffer) map[string]any {
 	return recs[0]
 }
 
-// serveWith runs one request through middleware.RequestLogger (wired as in
-// NewRouter, with writeError) and handler h, capturing logs at debug level.
+// serveWith runs one request through the engine NewRouter uses (newEngine,
+// with middleware.RequestLogger and writeError) and handler h, capturing logs
+// at debug level.
 func serveWith(t *testing.T, method, path string, h gin.HandlerFunc, header http.Header) (*httptest.ResponseRecorder, *bytes.Buffer) {
 	t.Helper()
 	var buf bytes.Buffer
 	accessLog := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.New()
-	r.Use(middleware.RequestLogger(accessLog, writeError, pathHealth))
+	r := newEngine(accessLog)
 	r.Handle(method, path, h)
 
 	req := httptest.NewRequestWithContext(t.Context(), method, path, http.NoBody)
@@ -69,7 +68,10 @@ func serveWith(t *testing.T, method, path string, h gin.HandlerFunc, header http
 
 // TestErrorsAreLoggedOnce pins down how writeError and RequestLogger work
 // together: every failure ends in exactly one request record, with the code
-// the client received.
+// the client received. RequestLogger's own behaviour (levels, request IDs,
+// panic recovery) is tested in package middleware; the health and panic rows
+// here check how newEngine wires it (pathHealth as a debug path, writeError as
+// the panic answer).
 func TestErrorsAreLoggedOnce(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -83,15 +85,7 @@ func TestErrorsAreLoggedOnce(t *testing.T) {
 		wantStack  bool
 	}{
 		{
-			name:       "success",
-			path:       "/api/v1/add",
-			handler:    func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"result": 3}) },
-			wantStatus: http.StatusOK,
-			wantBody:   `{"result":3}`,
-			wantLevel:  "INFO",
-		},
-		{
-			name:       "successful health probe is debug",
+			name:       "successful health probe is debug (pathHealth is wired as a debug path)",
 			path:       "/health",
 			handler:    func(c *gin.Context) { c.Status(http.StatusNoContent) },
 			wantStatus: http.StatusNoContent,
@@ -159,7 +153,7 @@ func TestErrorsAreLoggedOnce(t *testing.T) {
 			wantStack:  true,
 		},
 		{
-			name:       "panic is recovered into a 500 and logged once",
+			name:       "panic is answered by writeError and logged once",
 			path:       "/api/v1/sqrt",
 			handler:    func(*gin.Context) { panic("boom") },
 			wantStatus: http.StatusInternalServerError,
@@ -167,20 +161,6 @@ func TestErrorsAreLoggedOnce(t *testing.T) {
 			wantLevel:  "ERROR",
 			wantCode:   "error.internal",
 			wantError:  "error.internal: panic: boom",
-			wantStack:  true,
-		},
-		{
-			name: "panic after the response was written keeps the response",
-			path: "/api/v1/sqrt",
-			handler: func(c *gin.Context) {
-				c.String(http.StatusOK, "partial")
-				panic("late boom")
-			},
-			wantStatus: http.StatusOK,
-			wantBody:   "",
-			wantLevel:  "ERROR",
-			wantCode:   "error.internal",
-			wantError:  "error.internal: panic: late boom",
 			wantStack:  true,
 		},
 	}
