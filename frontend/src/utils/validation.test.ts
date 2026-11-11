@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from './validation'
+import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from '@/utils/validation'
 
 describe('validateOperand', () => {
   const cases = [

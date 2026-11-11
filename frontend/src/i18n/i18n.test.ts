@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Operation } from '../api/constants'
-import { errorMessage, fieldErrorMessage, formatNumber, operationText } from './index'
+import { Operation } from '@/api/constants'
+import { errorMessage, fieldErrorMessage, formatNumber, operationText } from '@/i18n/index'
 
 describe('errorMessage', () => {
   const cases = [

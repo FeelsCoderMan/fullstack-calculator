@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { calculate, isAbortError, OutcomeKind } from '../api/client'
-import { ClientErrorCode, Operation } from '../api/constants'
-import { Arity, arityOf, buildRequest, InputField, inputForField, inputsOf, type Operands } from '../api/operations'
-import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from '../utils/validation'
+import { calculate, isAbortError, OutcomeKind } from '@/api/client'
+import { ClientErrorCode, Operation } from '@/api/constants'
+import { Arity, arityOf, buildRequest, InputField, inputForField, inputsOf, type Operands } from '@/api/operations'
+import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from '@/utils/validation'
 
 /** Raw text of each input, exactly as typed. */
 export type FormValues = Record<InputField, string>

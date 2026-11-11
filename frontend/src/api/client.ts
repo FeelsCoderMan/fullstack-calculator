@@ -6,8 +6,8 @@ import {
   HttpMethod,
   MediaType,
   type Operation,
-} from './constants'
-import type { ErrorResponse, FieldError, OperationRequest, ResultResponse } from './types'
+} from '@/api/constants'
+import type { ErrorResponse, FieldError, OperationRequest, ResultResponse } from '@/api/types'
 
 /** What a calculation request ended with. Components never see raw responses. */
 export const OutcomeKind = {

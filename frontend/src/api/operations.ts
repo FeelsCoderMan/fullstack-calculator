@@ -1,5 +1,5 @@
-import { Operation, RequestField } from './constants'
-import type { OperationRequest } from './types'
+import { Operation, RequestField } from '@/api/constants'
+import type { OperationRequest } from '@/api/types'
 
 /** Number of operands an operation takes. */
 export const Arity = {

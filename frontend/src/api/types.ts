@@ -1,6 +1,6 @@
 // Aliases for the types generated from backend/api/openapi.yaml (npm run gen:api).
 // The spec is the source of truth: never hand-write a type it already defines.
-import type { components } from './schema.gen'
+import type { components } from '@/api/schema.gen'
 
 type Schemas = components['schemas']
 

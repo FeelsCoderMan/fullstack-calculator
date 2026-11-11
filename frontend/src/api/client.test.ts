@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { calculate } from './client'
-import { Operation } from './constants'
+import { calculate } from '@/api/client'
+import { Operation } from '@/api/constants'
 
 /** A response like the backend's (or a proxy's) with a raw body. */
 function respond(status: number, body: string, requestId = 'REQ-1'): Response {

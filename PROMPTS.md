@@ -533,3 +533,19 @@ separately:
 **80.** Confirming the README commit:
 
 > yes, commit it
+
+## Session 5 (continued): frontend refactor
+
+**81.**
+
+> lets continue with refactorization in frontend part. First of all, importing files should be
+> based on absolute rather than relative path. introduce compiler option for @ which should
+> point to root of frontend folder.
+
+**82.** Answering the agent's question on whether `@` should point to `frontend/` (imports
+like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convention): chose
+`@ → frontend/src`.
+
+**83.** Confirming the absolute-imports commit:
+
+> yes, commit it

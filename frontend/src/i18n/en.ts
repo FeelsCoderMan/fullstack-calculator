@@ -1,5 +1,5 @@
-import { ClientErrorCode, ErrorCode, FieldErrorCode, Operation, PRECISION_MAX, PRECISION_MIN } from '../api/constants'
-import type { ErrorCode as ApiErrorCode, FieldErrorCode as ApiFieldErrorCode } from '../api/types'
+import { ClientErrorCode, ErrorCode, FieldErrorCode, Operation, PRECISION_MAX, PRECISION_MIN } from '@/api/constants'
+import type { ErrorCode as ApiErrorCode, FieldErrorCode as ApiFieldErrorCode } from '@/api/types'
 
 /** How an operation is presented: its name, symbol, input labels and written-out expression. */
 export interface OperationText {

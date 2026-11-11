@@ -472,6 +472,11 @@ so they never appear in `go.mod` or the image. Upgrade one with
 Starts only after the backend is done (Decision 1).
 
 - Vite, React, TypeScript with `strict: true`. No `any` without a comment justifying it.
+- **Absolute imports only.** `@` is an alias for `frontend/src`: write
+  `import { calculate } from '@/api/client'`, never `'./client'` or `'../api/client'`. The
+  same goes for CSS modules, `vi.mock(...)` and `import('...')` type imports. The alias is
+  set in `tsconfig.app.json` (`paths`) and `vite.config.ts` (`resolve.alias`, also used by
+  Vitest); keep both in sync. oxlint (`no-restricted-imports`) rejects relative imports.
 - API types are **generated** from `backend/api/openapi.yaml` with `openapi-typescript`
   (`npm run gen:api`). Don't hand-write types that duplicate the spec.
 - Components never call `fetch` directly. They go through `src/api`.

@@ -1,5 +1,5 @@
-import type { Operation } from '../api/constants'
-import { en, type OperationText } from './en'
+import type { Operation } from '@/api/constants'
+import { en, type OperationText } from '@/i18n/en'
 
 /** The active messages. Only English exists; a second locale would be chosen here. */
 export const t = en

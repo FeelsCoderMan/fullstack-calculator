@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Operation } from './constants'
-import { buildRequest, inputForField, inputsOf } from './operations'
+import { Operation } from '@/api/constants'
+import { buildRequest, inputForField, inputsOf } from '@/api/operations'
 
 describe('inputsOf', () => {
   const cases = [

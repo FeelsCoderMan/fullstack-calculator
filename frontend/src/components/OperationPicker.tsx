@@ -1,8 +1,8 @@
 import { useId } from 'react'
-import { OPERATIONS, type Operation } from '../api/constants'
-import { operationText, t } from '../i18n'
-import { cx } from '../utils/dom'
-import styles from './OperationPicker.module.css'
+import { OPERATIONS, type Operation } from '@/api/constants'
+import { operationText, t } from '@/i18n'
+import { cx } from '@/utils/dom'
+import styles from '@/components/OperationPicker.module.css'
 
 interface OperationPickerProps {
   value: Operation

@@ -1,5 +1,5 @@
-import { FieldErrorCode, PRECISION_MAX, PRECISION_MIN } from '../api/constants'
-import type { FieldErrorCode as FieldErrorCodeValue } from '../api/types'
+import { FieldErrorCode, PRECISION_MAX, PRECISION_MIN } from '@/api/constants'
+import type { FieldErrorCode as FieldErrorCodeValue } from '@/api/types'
 
 /**
  * A plain decimal number, optionally signed and in exponent form: `12`, `-3.5`,

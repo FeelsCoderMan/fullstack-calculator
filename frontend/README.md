@@ -232,6 +232,11 @@ Accessibility:
   typed outcome (`success` / `fieldErrors` / `failure`) and never throws for HTTP or network
   errors.
 - **Strict TypeScript** (`strict`, `noUncheckedIndexedAccess`), no `any`.
+- **Absolute imports.** `@` points to `src/`, so every import is written from there:
+  `import { calculate } from '@/api/client'`, `import styles from '@/components/Field.module.css'`.
+  Relative imports (`./`, `../`) are a lint error. The alias is defined twice and must stay
+  in sync: `paths` in `tsconfig.app.json` (for the type checker) and `resolve.alias` in
+  `vite.config.ts` (for Vite and Vitest).
 - **Tests** are table-driven (`it.each` with named rows), following
   `.claude/skills/table-driven-tests/SKILL.md`. User flows (type, click, wait) are
   straight-line tests. Component tests mock `src/api/client`, and the client is tested with a

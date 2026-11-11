@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
@@ -8,6 +9,13 @@ const backendURL = 'http://localhost:8080'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // Imports are absolute from src/: '@/api/client'. Mirrors "paths" in
+    // tsconfig.app.json; Vitest uses this config too.
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     proxy: {
       '/api': backendURL,

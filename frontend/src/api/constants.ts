@@ -1,4 +1,4 @@
-import type { ErrorCode as ErrorCodeValue, FieldErrorCode as FieldErrorCodeValue } from './types'
+import type { ErrorCode as ErrorCodeValue, FieldErrorCode as FieldErrorCodeValue } from '@/api/types'
 
 /** Calculator operations offered by the UI, one backend endpoint each. */
 export const Operation = {

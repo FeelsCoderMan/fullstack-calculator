@@ -1,7 +1,7 @@
-import { SWAGGER_PATH } from './api/constants'
-import styles from './App.module.css'
-import { Calculator } from './components/Calculator'
-import { t } from './i18n'
+import { SWAGGER_PATH } from '@/api/constants'
+import styles from '@/App.module.css'
+import { Calculator } from '@/components/Calculator'
+import { t } from '@/i18n'
 
 export default function App() {
   return (
