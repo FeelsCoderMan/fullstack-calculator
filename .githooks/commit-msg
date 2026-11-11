@@ -9,7 +9,7 @@ set -euo pipefail
 msg_file="$1"
 max_len=72
 types='feat|fix|refactor|perf|test|docs|style|build|ci|chore|revert'
-scopes='backend|frontend|handler|service|config|logger|server|apperror|api|docker|deps|claude|githooks|readme'
+scopes='backend|frontend|handler|middleware|service|config|logger|server|apperror|api|docker|deps|claude|githooks|readme'
 non_imperative='added|adds|adding|fixed|fixes|fixing|updated|updates|updating|removed|removes|removing|changed|changes|changing|created|creates|creating|implemented|implements|implementing|refactored|refactors|refactoring|moved|moves|moving|renamed|renames|renaming|deleted|deletes|deleting|improved|improves|improving'
 
 # The message as git will store it: drop comment lines and everything below the

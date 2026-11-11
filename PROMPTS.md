@@ -514,3 +514,11 @@ separately:
 **76.** Confirming the middleware commit:
 
 > yes, commit it
+
+**77.** Answering whether to add `middleware` to the allowed commit scopes:
+
+> yes, add middleware to the commit scopes
+
+**78.** Confirming the scope commit:
+
+> yes, commit it

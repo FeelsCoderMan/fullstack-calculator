@@ -84,9 +84,9 @@ Choosing between close types:
 A short lowercase noun for the area touched, in parentheses. Use one of these, and leave
 the scope out when a change spans many areas:
 
-`backend`, `frontend`, `handler`, `service`, `config`, `logger`, `server`, `apperror`,
-`api` (openapi.yaml), `docker`, `deps`, `claude` (.claude/ agents, skills, hooks),
-`githooks`, `readme`.
+`backend`, `frontend`, `handler`, `middleware`, `service`, `config`, `logger`, `server`,
+`apperror`, `api` (openapi.yaml), `docker`, `deps`, `claude` (.claude/ agents, skills,
+hooks), `githooks`, `readme`.
 
 ### Subject line
 
