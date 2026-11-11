@@ -1,4 +1,5 @@
-package handler
+// Package middleware holds the gin middleware that wraps every route.
+package middleware
 
 import (
 	"crypto/rand"
@@ -6,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,16 +18,21 @@ import (
 
 var validRequestID = regexp.MustCompile(requestIDPattern)
 
+// ErrorWriter ends a failed request: it writes the error response and records
+// the failure with RecordFailure (the handler's writeError).
+type ErrorWriter func(c *gin.Context, err error)
+
 // RequestLogger writes exactly one record per request (docs/logging.md): after
 // the handler chain finishes it logs method, path, status, duration and
-// request ID, plus the code, error and (for unexpected failures) stack that
-// writeError recorded. Nothing else logs per request, so nothing is logged
-// twice.
+// request ID, plus the code, error and (for unexpected failures) stack of the
+// Failure recorded with RecordFailure. Nothing else logs per request, so
+// nothing is logged twice.
 //
 // It also assigns the request ID (echoed in X-Request-ID) and recovers
-// panics: a panic becomes a 500 error.internal response and is reported in the
-// same single record, with the panic's stack.
-func RequestLogger(accessLog *slog.Logger) gin.HandlerFunc {
+// panics: a panic is answered with writeError (a 500 error.internal) and
+// reported in the same single record, with the panic's stack. Successful
+// requests to debugPaths (health probes) are logged at debug level.
+func RequestLogger(accessLog *slog.Logger, writeError ErrorWriter, debugPaths ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		id := requestID(c.GetHeader(HeaderRequestID))
@@ -40,11 +47,11 @@ func RequestLogger(accessLog *slog.Logger) gin.HandlerFunc {
 				if !c.Writer.Written() {
 					writeError(c, panicErr)
 				} else {
-					c.Set(contextKeyFailure, failure{err: panicErr, appErr: panicErr, code: panicErr.Code})
+					RecordFailure(c, Failure{Err: panicErr, AppErr: panicErr, Code: panicErr.Code})
 				}
 			}
 
-			logRequest(c, accessLog, id, time.Since(start))
+			logRequest(c, accessLog, id, time.Since(start), debugPaths)
 
 			// net/http uses ErrAbortHandler to abort a response on purpose;
 			// it must keep propagating (it is logged above, once).
@@ -57,7 +64,7 @@ func RequestLogger(accessLog *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func logRequest(c *gin.Context, accessLog *slog.Logger, id string, elapsed time.Duration) {
+func logRequest(c *gin.Context, accessLog *slog.Logger, id string, elapsed time.Duration, debugPaths []string) {
 	path, status := c.Request.URL.Path, c.Writer.Status()
 	attrs := []slog.Attr{
 		logger.Method(c.Request.Method),
@@ -70,24 +77,24 @@ func logRequest(c *gin.Context, accessLog *slog.Logger, id string, elapsed time.
 	f, failed := recordedFailure(c)
 	if failed {
 		attrs = append(attrs,
-			logger.Code(string(f.code)),
-			logger.Err(f.err),
-			logger.Stack(f.appErr.Stack()),
+			logger.Code(string(f.Code)),
+			logger.Err(f.Err),
+			logger.Stack(f.AppErr.Stack()),
 		)
 	}
 
-	accessLog.LogAttrs(c.Request.Context(), requestLevel(path, status, failed && f.code == apperror.CodeInternal),
-		msgRequestCompleted, attrs...)
+	level := requestLevel(path, status, failed && f.Code == apperror.CodeInternal, debugPaths)
+	accessLog.LogAttrs(c.Request.Context(), level, msgRequestCompleted, attrs...)
 }
 
 // requestLevel picks the record's level (docs/logging.md section 5): server
-// failures are always errors, successful health probes are debug, and
-// everything else, client errors included, is info.
-func requestLevel(path string, status int, internal bool) slog.Level {
+// failures are always errors, successful requests to debugPaths (health
+// probes) are debug, and everything else, client errors included, is info.
+func requestLevel(path string, status int, internal bool, debugPaths []string) slog.Level {
 	switch {
 	case internal || status >= http.StatusInternalServerError:
 		return slog.LevelError
-	case path == PathHealth && status < http.StatusBadRequest:
+	case status < http.StatusBadRequest && slices.Contains(debugPaths, path):
 		return slog.LevelDebug
 	default:
 		return slog.LevelInfo

@@ -42,13 +42,19 @@ linters:
   settings:
     depguard:
       rules:
-        gin-only-in-handler:
+        gin-only-in-http-layer:
+          files:
+            - "$all"
+            - "!**/internal/handler/**"
+            - "!**/internal/middleware/**"
+          deny:
+            - pkg: github.com/gin-gonic/gin
+              desc: "gin is confined to internal/handler and internal/middleware (AGENTS.md Decision 8)"
+        validator-only-in-handler:
           files:
             - "$all"
             - "!**/internal/handler/**"
           deny:
-            - pkg: github.com/gin-gonic/gin
-              desc: "gin is confined to internal/handler (AGENTS.md Decision 8)"
             - pkg: github.com/go-playground/validator
               desc: "request validation is confined to internal/handler"
 

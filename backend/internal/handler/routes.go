@@ -8,16 +8,18 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"fullstack-calculator/backend/internal/middleware"
 )
 
-// NewRouter registers all HTTP routes on a gin engine behind RequestLogger,
-// serving the operations with calc.
+// NewRouter registers all HTTP routes on a gin engine behind
+// middleware.RequestLogger, serving the operations with calc.
 //
 // It returns an http.Handler rather than *gin.Engine so that callers (the
 // server wiring) stay framework-agnostic. The engine is built with gin.New,
 // not gin.Default: gin's own logger and recovery middleware write plain text,
-// while RequestLogger writes one JSON record per request and recovers panics
-// itself (docs/logging.md).
+// while middleware.RequestLogger writes one JSON record per request and
+// recovers panics itself (docs/logging.md).
 func NewRouter(accessLog *slog.Logger, calc Calculator) (http.Handler, error) {
 	validate, err := newValidator()
 	if err != nil {
@@ -30,7 +32,7 @@ func NewRouter(accessLog *slog.Logger, calc Calculator) (http.Handler, error) {
 
 	r := gin.New()
 	r.HandleMethodNotAllowed = true // 405 instead of 404 for a known path with the wrong method
-	r.Use(RequestLogger(accessLog))
+	r.Use(middleware.RequestLogger(accessLog, writeError, PathHealth))
 	r.NoRoute(notFound)
 	r.NoMethod(methodNotAllowed)
 

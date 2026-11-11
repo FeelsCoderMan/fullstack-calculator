@@ -499,3 +499,18 @@ session:
 separately:
 
 > yes, commit them separately
+
+**74.**
+
+> where is request objects in handler ? Do not write any code, show me where they are. I need
+> request objects to understand what is expected from request. validatior/v10 is used because
+> of struct min max properties inside the request struct
+
+**75.**
+
+> move the middlewares into internal/middleware. I'm seeing that request_logger placed inside
+> of handler which is wrong
+
+**76.** Confirming the middleware commit:
+
+> yes, commit it

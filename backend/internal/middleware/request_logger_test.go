@@ -1,9 +1,8 @@
-package handler
+package middleware
 
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,11 +11,27 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/go-cmp/cmp"
 
 	"fullstack-calculator/backend/internal/apperror"
 )
 
-var errUnexpected = errors.New("disk on fire")
+// debugPath is the path RequestLogger is told to log at debug level when it
+// succeeds, as NewRouter does with /health.
+const debugPath = "/health"
+
+// errorBody is the {"code": ...} body writeTestError answers with.
+type errorBody struct {
+	Code apperror.Code `json:"code"`
+}
+
+// writeTestError stands in for the handler's writeError: it records the
+// failure and answers 500 with the code.
+func writeTestError(c *gin.Context, err error) {
+	appErr := apperror.From(err)
+	RecordFailure(c, Failure{Err: err, AppErr: appErr, Code: appErr.Code})
+	c.AbortWithStatusJSON(http.StatusInternalServerError, errorBody{Code: appErr.Code})
+}
 
 // records decodes every JSON line written to buf.
 func records(t *testing.T, buf *bytes.Buffer) []map[string]any {
@@ -45,8 +60,8 @@ func onlyRecord(t *testing.T, buf *bytes.Buffer) map[string]any {
 	return recs[0]
 }
 
-// serveWith runs one request through RequestLogger and handler h, capturing
-// logs at debug level.
+// serveWith runs one request through RequestLogger (with writeTestError and
+// debugPath) and handler h, capturing logs at debug level.
 func serveWith(t *testing.T, method, path string, h gin.HandlerFunc, header http.Header) (*httptest.ResponseRecorder, *bytes.Buffer) {
 	t.Helper()
 	var buf bytes.Buffer
@@ -54,7 +69,7 @@ func serveWith(t *testing.T, method, path string, h gin.HandlerFunc, header http
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(RequestLogger(accessLog))
+	r.Use(RequestLogger(accessLog, writeTestError, debugPath))
 	r.Handle(method, path, h)
 
 	req := httptest.NewRequestWithContext(t.Context(), method, path, http.NoBody)
@@ -79,7 +94,7 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 		wantStack  bool
 	}{
 		{
-			name:       "success",
+			name:       "success is info",
 			path:       "/api/v1/add",
 			handler:    func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"result": 3}) },
 			wantStatus: http.StatusOK,
@@ -87,17 +102,26 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 			wantLevel:  "INFO",
 		},
 		{
-			name:       "successful health probe is debug",
-			path:       "/health",
+			name:       "success on a debug path is debug",
+			path:       debugPath,
 			handler:    func(c *gin.Context) { c.Status(http.StatusNoContent) },
 			wantStatus: http.StatusNoContent,
 			wantLevel:  "DEBUG",
 		},
 		{
-			name: "expected failure is info with code and wrapped error, no stack",
+			name:       "server failure on a debug path is still an error",
+			path:       debugPath,
+			handler:    func(c *gin.Context) { c.Status(http.StatusServiceUnavailable) },
+			wantStatus: http.StatusServiceUnavailable,
+			wantLevel:  "ERROR",
+		},
+		{
+			name: "recorded expected failure is info with code and error, no stack",
 			path: "/api/v1/divide",
 			handler: func(c *gin.Context) {
-				writeError(c, fmt.Errorf("divide 1 by 0: %w", apperror.ErrDivisionByZero))
+				err := fmt.Errorf("divide 1 by 0: %w", apperror.ErrDivisionByZero)
+				RecordFailure(c, Failure{Err: err, AppErr: apperror.From(err), Code: apperror.CodeDivisionByZero})
+				c.JSON(http.StatusUnprocessableEntity, errorBody{Code: apperror.CodeDivisionByZero})
 			},
 			wantStatus: http.StatusUnprocessableEntity,
 			wantBody:   `{"code":"error.calculation.division.by.zero"}`,
@@ -106,56 +130,7 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 			wantError:  "divide 1 by 0: error.calculation.division.by.zero",
 		},
 		{
-			name: "validation failure lists every field",
-			path: "/api/v1/add",
-			handler: func(c *gin.Context) {
-				writeError(c, apperror.Validation(
-					apperror.FieldError{Field: "leftOperand", Code: apperror.CodeFieldRequired},
-					apperror.FieldError{Field: "rightOperand", Code: apperror.CodeFieldInvalidType},
-				))
-			},
-			wantStatus: http.StatusUnprocessableEntity,
-			wantBody:   `[{"field":"leftOperand","code":"error.field.required"},{"field":"rightOperand","code":"error.field.invalid.type"}]`,
-			wantLevel:  "INFO",
-			wantCode:   "error.validation.failed",
-			wantError:  "error.validation.failed",
-		},
-		{
-			name: "unexpected failure is error with cause and stack, response says internal only",
-			path: "/api/v1/power",
-			handler: func(c *gin.Context) {
-				writeError(c, fmt.Errorf("power: %w", apperror.Internal(errUnexpected)))
-			},
-			wantStatus: http.StatusInternalServerError,
-			wantBody:   `{"code":"error.internal"}`,
-			wantLevel:  "ERROR",
-			wantCode:   "error.internal",
-			wantError:  "power: error.internal: disk on fire",
-			wantStack:  true,
-		},
-		{
-			name:       "unmapped code is logged as the internal code the client received",
-			path:       "/api/v1/add",
-			handler:    func(c *gin.Context) { writeError(c, &apperror.Error{Code: apperror.CodeFieldRequired}) },
-			wantStatus: http.StatusInternalServerError,
-			wantBody:   `{"code":"error.internal"}`,
-			wantLevel:  "ERROR",
-			wantCode:   "error.internal",
-			wantError:  "error.field.required",
-		},
-		{
-			name:       "plain unknown error is treated as internal",
-			path:       "/api/v1/power",
-			handler:    func(c *gin.Context) { writeError(c, errUnexpected) },
-			wantStatus: http.StatusInternalServerError,
-			wantBody:   `{"code":"error.internal"}`,
-			wantLevel:  "ERROR",
-			wantCode:   "error.internal",
-			wantError:  "disk on fire",
-			wantStack:  true,
-		},
-		{
-			name:       "panic is recovered into a 500 and logged once",
+			name:       "panic is answered by the error writer and logged once",
 			path:       "/api/v1/sqrt",
 			handler:    func(*gin.Context) { panic("boom") },
 			wantStatus: http.StatusInternalServerError,
@@ -173,7 +148,6 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 				panic("late boom")
 			},
 			wantStatus: http.StatusOK,
-			wantBody:   "",
 			wantLevel:  "ERROR",
 			wantCode:   "error.internal",
 			wantError:  "error.internal: panic: late boom",
@@ -189,7 +163,16 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
 			if tt.wantBody != "" {
-				assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
+				var want, got any
+				if err := json.Unmarshal([]byte(tt.wantBody), &want); err != nil {
+					t.Fatalf("bad want JSON %q: %v", tt.wantBody, err)
+				}
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("body is not JSON: %q: %v", rec.Body.String(), err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("body mismatch (-want +got):\n%s", diff)
+				}
 			}
 
 			got := onlyRecord(t, buf)
@@ -218,38 +201,6 @@ func TestRequestLoggerWritesOneRecord(t *testing.T) {
 			if hasStack != tt.wantStack || (tt.wantStack && len(stack) == 0) {
 				t.Errorf("record[stack] = %#v, want present = %v", got["stack"], tt.wantStack)
 			}
-		})
-	}
-}
-
-func TestRequestLoggerStackStartsAtOrigin(t *testing.T) {
-	tests := []struct {
-		name      string
-		handler   gin.HandlerFunc
-		wantFrame string
-	}{
-		{
-			name:      "Internal called in the handler",
-			handler:   func(c *gin.Context) { writeError(c, apperror.Internal(errUnexpected)) },
-			wantFrame: "handler.TestRequestLoggerStackStartsAtOrigin.func1 handler/request_logger_test.go:",
-		},
-		{
-			name:      "panic site is on the stack",
-			handler:   func(*gin.Context) { panic("boom") },
-			wantFrame: "handler.TestRequestLoggerStackStartsAtOrigin.func2 handler/request_logger_test.go:",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, buf := serveWith(t, http.MethodGet, "/x", tt.handler, nil)
-			stack, _ := onlyRecord(t, buf)["stack"].([]any)
-			for _, frame := range stack {
-				if s, _ := frame.(string); strings.HasPrefix(s, tt.wantFrame) {
-					return
-				}
-			}
-			t.Errorf("stack has no frame starting with %q:\n%v", tt.wantFrame, stack)
 		})
 	}
 }

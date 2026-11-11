@@ -39,7 +39,7 @@ unless explicitly asked.
    (typed constants) or a helper function. See [No hardcoded strings](#no-hardcoded-strings).
 7. **Structured logging** with `log/slog`, JSON lines on stdout (shipped to Grafana Loki).
    Optional dev-only file output. See [Logging](#logging-backend).
-8. **Gin for HTTP routing**, confined to `internal/handler`. `http.Server` (timeouts, graceful
+8. **Gin for HTTP routing**, confined to `internal/handler` and `internal/middleware`. `http.Server` (timeouts, graceful
    shutdown) stays in `internal/server`. See [Rules](#rules).
 
 ## No hardcoded strings
@@ -111,7 +111,8 @@ Each package keeps its declarations in two dedicated files, the same way a domai
 │   ├── cmd/server/           # main: server.NewApp() + app.Run(), logs either error, exits 1
 │   └── internal/
 │       ├── server/           # App: config, wiring (DI), listen, graceful shutdown
-│       ├── handler/          # HTTP layer: routing, decode/validate, DTOs, error→status mapping, middleware, swagger
+│       ├── handler/          # HTTP layer: routing, request binding/validation, DTOs, error→status mapping, swagger
+│       ├── middleware/       # gin middleware around every route: RequestLogger (one record per request, request ID, panic recovery)
 │       ├── service/          # business logic (calculator operations), no net/http or gin imports
 │       ├── repository/       # persistence ports/adapters (none needed yet; see below)
 │       ├── apperror/         # error code catalog + typed errors shared across layers
@@ -242,7 +243,7 @@ far: all of them (`add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`, `per
 HTTP request → handler → service → repository
 ```
 
-- **handler**: the only layer that knows HTTP and the only package that imports gin. It decodes and validates the request shape,
+- **handler**: the only layer that knows HTTP and, with `middleware`, the only package that imports gin. It decodes and validates the request shape,
   calls the service, writes the response, and maps `apperror` → status code in **one** place.
   It depends on a service **interface** declared in the handler package (consumer-side
   interfaces, idiomatic Go).
@@ -257,7 +258,9 @@ HTTP request → handler → service → repository
 
 ### Rules
 
-- Routing with [gin](https://github.com/gin-gonic/gin), confined to `internal/handler`.
+- Routing with [gin](https://github.com/gin-gonic/gin), confined to `internal/handler` and
+  `internal/middleware` (cross-cutting middleware such as `RequestLogger`; `handler` imports
+  `middleware`, never the reverse).
   `handler.NewRouter` returns an `http.Handler` (and an error), so `internal/server` stays framework-agnostic
   and keeps owning `http.Server` (timeouts, graceful shutdown). Don't use `engine.Run()`.
   - Build the engine with `gin.New()`, never `gin.Default()`. Gin's logger and recovery

@@ -23,7 +23,7 @@ document is the full reference. Code that disagrees with it is a bug.
 
 | Event                         | Logged by                               | Category | Record                                   |
 |-------------------------------|-----------------------------------------|----------|------------------------------------------|
-| HTTP request handled          | `RequestLogger` middleware (handler pkg) | `http`   | exactly one `request completed` record  |
+| HTTP request handled          | `RequestLogger` (`internal/middleware`) | `http`   | exactly one `request completed` record  |
 | Error while handling a request | nobody separately; it goes into the request record | `http` | fields on `request completed` |
 | Panic in a handler            | `RequestLogger` (recovers it)           | `http`   | the request record, as a 500 with a stack |
 | Server lifecycle              | `internal/server`                       | `server` | `server listening`, `shutdown signal received, draining connections`, `server stopped` |
@@ -35,8 +35,8 @@ Rules that follow from this table:
 
 - **`service` and `repository` never log.** They return errors. `apperror` never logs.
 - **Handlers never log errors.** A handler that fails calls `writeError(c, err)` and
-  returns. `writeError` writes the JSON response and *attaches* the error to the request.
-  It doesn't print anything.
+  returns. `writeError` writes the JSON response and *attaches* the error to the request
+  with `middleware.RecordFailure`. It doesn't print anything.
 - **`RequestLogger` writes the single record** after the handler chain has finished, so
   it knows the final status, the duration and the attached error.
 - A function that returns an error doesn't log it. A function that logs an error doesn't
@@ -51,11 +51,16 @@ request ─▶ RequestLogger ─▶ (gin routing) ─▶ handler ─▶ service
               │                                 ▼
               │                       writeError(c, err)
               │                         ├─ apperror.From(err) → *apperror.Error (code, stack)
-              │                         ├─ attach {err, appErr} to gin context
+              │                         ├─ middleware.RecordFailure(c, {err, appErr, code})
               │                         └─ c.JSON(status(code), {"code": ...})
               ▼
    after c.Next(): one record ── level from status, plus code / error / stack if attached
 ```
+
+`RequestLogger` lives in `internal/middleware`, which must not import `handler`.
+`NewRouter` wires it as `middleware.RequestLogger(accessLog, writeError, PathHealth)`: it
+gets the handler's `writeError` to answer a recovered panic (so code → status stays mapped
+in one place), and the paths whose successful requests are logged at `debug`.
 
 `RequestLogger` also:
 
@@ -65,7 +70,7 @@ request ─▶ RequestLogger ─▶ (gin routing) ─▶ handler ─▶ service
   `X-Request-ID` response header and puts it in the record. A user who reports a problem
   can quote it, and it finds the exact record in Loki.
 - **recovers panics.** Every panic becomes `apperror.Panic(v)`: `error.internal` with the
-  panic's stack. It is written as a 500 JSON response if nothing was written yet, and
+  panic's stack. It is answered with `writeError` (a 500 JSON response) if nothing was written yet, and
   reported in the same single record. A panic never produces net/http's multi-line stack
   dump. `http.ErrAbortHandler` is handled the same way, and is then re-panicked so net/http
   can abort the connection as it expects.

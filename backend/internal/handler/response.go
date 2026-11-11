@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"fullstack-calculator/backend/internal/apperror"
+	"fullstack-calculator/backend/internal/middleware"
 )
 
 // errorResponse is the body of every error response except validation errors:
@@ -20,15 +21,6 @@ type errorResponse struct {
 type fieldErrorResponse struct {
 	Field string        `json:"field"`
 	Code  apperror.Code `json:"code"`
-}
-
-// failure is what writeError records for RequestLogger: the error as returned
-// (its text has the full wrap context), the resolved application error (for
-// its stack) and the code the client actually received.
-type failure struct {
-	err    error
-	appErr *apperror.Error
-	code   apperror.Code
 }
 
 // codeStatus is the single place that maps error codes to HTTP status codes.
@@ -59,7 +51,7 @@ func statusFor(code apperror.Code) int {
 }
 
 // writeError ends a failed request: it resolves err to an application error,
-// records it for RequestLogger (which logs it, once, in the request record)
+// records it for middleware.RequestLogger (which logs it, once, in the request record)
 // and writes the JSON error response. It does not log anything itself.
 func writeError(c *gin.Context, err error) {
 	appErr := apperror.From(err)
@@ -70,7 +62,7 @@ func writeError(c *gin.Context, err error) {
 	case code == apperror.CodeValidationFailed && len(appErr.Fields) == 0:
 		code = apperror.CodeInternal // a bug: an empty array would tell the client nothing
 	}
-	c.Set(contextKeyFailure, failure{err: err, appErr: appErr, code: code})
+	middleware.RecordFailure(c, middleware.Failure{Err: err, AppErr: appErr, Code: code})
 	c.AbortWithStatusJSON(statusFor(code), errorBody(code, appErr.Fields))
 }
 
@@ -86,16 +78,6 @@ func errorBody(code apperror.Code, fields []apperror.FieldError) any {
 		body = append(body, fieldErrorResponse{Field: f.Field, Code: f.Code})
 	}
 	return body
-}
-
-// recordedFailure returns the failure writeError recorded for this request.
-func recordedFailure(c *gin.Context) (failure, bool) {
-	v, ok := c.Get(contextKeyFailure)
-	if !ok {
-		return failure{}, false
-	}
-	f, ok := v.(failure)
-	return f, ok
 }
 
 // notFound answers unknown routes (gin NoRoute).
