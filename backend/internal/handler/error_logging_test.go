@@ -55,7 +55,7 @@ func serveWith(t *testing.T, method, path string, h gin.HandlerFunc, header http
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(middleware.RequestLogger(accessLog, writeError, PathHealth))
+	r.Use(middleware.RequestLogger(accessLog, writeError, pathHealth))
 	r.Handle(method, path, h)
 
 	req := httptest.NewRequestWithContext(t.Context(), method, path, http.NoBody)

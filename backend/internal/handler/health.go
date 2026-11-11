@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Health reports that the process is up and able to serve requests. The status
+// health reports that the process is up and able to serve requests. The status
 // code is the whole answer: 204 No Content, no body (see api/openapi.yaml).
-func Health(c *gin.Context) {
+func health(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }

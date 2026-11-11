@@ -104,21 +104,21 @@ func TestBindJSONMatchesNamesExactly(t *testing.T) {
 	}{
 		{
 			name:       "upper-case operand name is unknown, not the operand",
-			path:       PathAdd,
+			path:       pathAdd,
 			body:       `{"LEFTOPERAND":1,"rightOperand":2}`,
 			wantStatus: http.StatusUnprocessableEntity,
 			wantBody:   `[{"field":"leftOperand","code":"error.field.required"},{"field":"LEFTOPERAND","code":"error.field.unknown"}]`,
 		},
 		{
 			name:       "differently cased precision is unknown and does not round",
-			path:       PathSqrt,
+			path:       pathSqrt,
 			body:       `{"operand":2,"Precision":2}`,
 			wantStatus: http.StatusUnprocessableEntity,
 			wantBody:   `[{"field":"Precision","code":"error.field.unknown"}]`,
 		},
 		{
 			name:       "exact names bind",
-			path:       PathSqrt,
+			path:       pathSqrt,
 			body:       `{"operand":2,"precision":2}`,
 			wantStatus: http.StatusOK,
 			wantBody:   `{"result":1.41}`,

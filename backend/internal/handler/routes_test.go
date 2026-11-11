@@ -13,8 +13,8 @@ import (
 // docRoutes serve the documentation itself; they are not part of the API
 // contract, so they are not described in api/openapi.yaml.
 var docRoutes = []string{
-	http.MethodGet + " " + PathSwaggerUI,
-	http.MethodGet + " " + PathSwaggerSpec,
+	http.MethodGet + " " + pathSwaggerUI,
+	http.MethodGet + " " + pathSwaggerSpec,
 }
 
 // ginParam matches gin path parameters (":id") so they can be compared with

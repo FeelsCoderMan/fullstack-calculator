@@ -33,19 +33,19 @@ func NewRouter(accessLog *slog.Logger, calc Calculator) (http.Handler, error) {
 
 	r := gin.New()
 	r.HandleMethodNotAllowed = true // 405 instead of 404 for a known path with the wrong method
-	r.Use(middleware.RequestLogger(accessLog, writeError, PathHealth))
+	r.Use(middleware.RequestLogger(accessLog, writeError, pathHealth))
 	r.NoRoute(notFound)
 	r.NoMethod(methodNotAllowed)
 
-	r.Match([]string{http.MethodGet, http.MethodHead}, PathHealth, Health)
+	r.Match([]string{http.MethodGet, http.MethodHead}, pathHealth, health)
 
 	// Calculator operations: /api/v1/<operation>. A breaking change gets a new
 	// version group (/api/v2) next to this one instead of changing it.
-	v1 := r.Group(PathAPI).Group(PathV1)
+	v1 := r.Group(pathAPI).Group(pathV1)
 	newCalculatorHandler(calc, validate).registerHandlers(v1)
 
 	// API documentation: Swagger UI and the raw spec (api/openapi.yaml).
-	r.GET(PathSwaggerUI, SwaggerUI)
-	r.GET(PathSwaggerSpec, OpenAPISpec)
+	r.GET(pathSwaggerUI, swaggerUI)
+	r.GET(pathSwaggerSpec, openAPISpec)
 	return r, nil
 }

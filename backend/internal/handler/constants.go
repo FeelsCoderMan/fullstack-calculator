@@ -2,15 +2,15 @@ package handler
 
 // URL paths served outside the versioned API.
 const (
-	PathHealth      = "/health"
-	PathSwaggerUI   = "/swagger/"
-	PathSwaggerSpec = "/swagger/openapi.yaml"
+	pathHealth      = "/health"
+	pathSwaggerUI   = "/swagger/"
+	pathSwaggerSpec = "/swagger/openapi.yaml"
 )
 
-// Route groups of the API: every operation is served under PathAPI + PathV1.
+// Route groups of the API: every operation is served under pathAPI + pathV1.
 const (
-	PathAPI = "/api"
-	PathV1  = "/v1"
+	pathAPI = "/api"
+	pathV1  = "/v1"
 )
 
 // Operation routes, relative to the /api/v1 group
@@ -27,13 +27,13 @@ const (
 
 // Full URL paths of the operations, as clients call them (api/openapi.yaml).
 const (
-	PathAdd        = PathAPI + PathV1 + routeAdd
-	PathSubtract   = PathAPI + PathV1 + routeSubtract
-	PathMultiply   = PathAPI + PathV1 + routeMultiply
-	PathDivide     = PathAPI + PathV1 + routeDivide
-	PathPower      = PathAPI + PathV1 + routePower
-	PathPercentage = PathAPI + PathV1 + routePercentage
-	PathSqrt       = PathAPI + PathV1 + routeSqrt
+	pathAdd        = pathAPI + pathV1 + routeAdd
+	pathSubtract   = pathAPI + pathV1 + routeSubtract
+	pathMultiply   = pathAPI + pathV1 + routeMultiply
+	pathDivide     = pathAPI + pathV1 + routeDivide
+	pathPower      = pathAPI + pathV1 + routePower
+	pathPercentage = pathAPI + pathV1 + routePercentage
+	pathSqrt       = pathAPI + pathV1 + routeSqrt
 )
 
 // maxBodyBytes is the largest accepted request body (1 MiB).

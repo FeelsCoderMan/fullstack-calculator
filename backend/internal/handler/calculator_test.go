@@ -319,10 +319,10 @@ func TestAdd(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathAdd, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathAdd, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathAdd, truncate(tt.body), rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathAdd, truncate(tt.body), rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -423,10 +423,10 @@ func TestSubtract(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathSubtract, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathSubtract, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathSubtract, tt.body, rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathSubtract, tt.body, rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -541,10 +541,10 @@ func TestMultiply(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathMultiply, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathMultiply, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathMultiply, tt.body, rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathMultiply, tt.body, rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -708,10 +708,10 @@ func TestDivide(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathDivide, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathDivide, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathDivide, tt.body, rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathDivide, tt.body, rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -854,10 +854,10 @@ func TestPower(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathPower, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathPower, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathPower, tt.body, rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathPower, tt.body, rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -979,10 +979,10 @@ func TestPercentage(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathPercentage, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathPercentage, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathPercentage, tt.body, rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathPercentage, tt.body, rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -1202,10 +1202,10 @@ func TestSqrt(t *testing.T) {
 	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, rec := serveJSON(t, router, PathSqrt, tt.contentType, tt.body)
+			req, rec := serveJSON(t, router, pathSqrt, tt.contentType, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("POST %s %s status = %d, want %d", PathSqrt, tt.body, rec.Code, tt.wantStatus)
+				t.Errorf("POST %s %s status = %d, want %d", pathSqrt, tt.body, rec.Code, tt.wantStatus)
 			}
 			assertJSONEqual(t, tt.wantBody, rec.Body.Bytes())
 			assertMatchesSpec(t, req, rec)
@@ -1223,97 +1223,97 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 	}{
 		{
 			name: "add negative zero operands",
-			path: PathAdd,
+			path: pathAdd,
 			body: `{"leftOperand":-0,"rightOperand":-0}`,
 		},
 		{
 			name: "add negative underflow",
-			path: PathAdd,
+			path: pathAdd,
 			body: `{"leftOperand":-1e-400,"rightOperand":-0}`,
 		},
 		{
 			name: "add rounding a small negative number",
-			path: PathAdd,
+			path: pathAdd,
 			body: `{"leftOperand":-0.001,"rightOperand":0,"precision":2}`,
 		},
 		{
 			name: "subtract zero from negative zero",
-			path: PathSubtract,
+			path: pathSubtract,
 			body: `{"leftOperand":-0,"rightOperand":0}`,
 		},
 		{
 			name: "subtract rounding a small negative number",
-			path: PathSubtract,
+			path: pathSubtract,
 			body: `{"leftOperand":0,"rightOperand":0.001,"precision":2}`,
 		},
 		{
 			name: "multiply zero by a negative number",
-			path: PathMultiply,
+			path: pathMultiply,
 			body: `{"leftOperand":0,"rightOperand":-5}`,
 		},
 		{
 			name: "multiply negative underflow",
-			path: PathMultiply,
+			path: pathMultiply,
 			body: `{"leftOperand":-1e-200,"rightOperand":1e-200}`,
 		},
 		{
 			name: "multiply rounding a small negative product",
-			path: PathMultiply,
+			path: pathMultiply,
 			body: `{"leftOperand":-0.01,"rightOperand":0.1,"precision":2}`,
 		},
 		{
 			name: "divide zero by a negative number",
-			path: PathDivide,
+			path: pathDivide,
 			body: `{"leftOperand":0,"rightOperand":-5}`,
 		},
 		{
 			name: "divide negative underflow",
-			path: PathDivide,
+			path: pathDivide,
 			body: `{"leftOperand":-1e-300,"rightOperand":1e300}`,
 		},
 		{
 			name: "divide rounding a small negative quotient",
-			path: PathDivide,
+			path: pathDivide,
 			body: `{"leftOperand":-1,"rightOperand":1000,"precision":2}`,
 		},
 		{
 			name: "power of negative zero to an odd exponent",
-			path: PathPower,
+			path: pathPower,
 			body: `{"leftOperand":-0,"rightOperand":3}`,
 		},
 		{
 			name: "power negative underflow",
-			path: PathPower,
+			path: pathPower,
 			body: `{"leftOperand":-10,"rightOperand":-401}`,
 		},
 		{
 			name: "power rounding a small negative result",
-			path: PathPower,
+			path: pathPower,
 			body: `{"leftOperand":-0.1,"rightOperand":3,"precision":2}`,
 		},
 		{
 			name: "percentage of a negative number at zero percent",
-			path: PathPercentage,
+			path: pathPercentage,
 			body: `{"leftOperand":0,"rightOperand":-5}`,
 		},
 		{
 			name: "percentage negative underflow",
-			path: PathPercentage,
+			path: pathPercentage,
 			body: `{"leftOperand":-1e-300,"rightOperand":1e-300}`,
 		},
 		{
 			name: "percentage rounding a small negative result",
-			path: PathPercentage,
+			path: pathPercentage,
 			body: `{"leftOperand":-1,"rightOperand":0.1,"precision":2}`,
 		},
 		{
 			name: "sqrt of negative zero",
-			path: PathSqrt,
+			path: pathSqrt,
 			body: `{"operand":-0}`,
 		},
 		{
 			name: "sqrt of an operand that underflows to negative zero",
-			path: PathSqrt,
+			path: pathSqrt,
 			body: `{"operand":-1e-400}`,
 		},
 	}
@@ -1404,13 +1404,13 @@ func TestOperationServiceErrors(t *testing.T) {
 		path string
 		body string
 	}{
-		{name: "add", path: PathAdd, body: `{"leftOperand":1,"rightOperand":2}`},
-		{name: "subtract", path: PathSubtract, body: `{"leftOperand":1,"rightOperand":2}`},
-		{name: "multiply", path: PathMultiply, body: `{"leftOperand":1,"rightOperand":2}`},
-		{name: "divide", path: PathDivide, body: `{"leftOperand":1,"rightOperand":2}`},
-		{name: "power", path: PathPower, body: `{"leftOperand":1,"rightOperand":2}`},
-		{name: "percentage", path: PathPercentage, body: `{"leftOperand":1,"rightOperand":2}`},
-		{name: "sqrt", path: PathSqrt, body: `{"operand":4}`},
+		{name: "add", path: pathAdd, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "subtract", path: pathSubtract, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "multiply", path: pathMultiply, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "divide", path: pathDivide, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "power", path: pathPower, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "percentage", path: pathPercentage, body: `{"leftOperand":1,"rightOperand":2}`},
+		{name: "sqrt", path: pathSqrt, body: `{"operand":4}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

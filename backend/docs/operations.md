@@ -260,7 +260,7 @@ Notes per operation:
    (`fmt.Errorf("x %g and %g: %w", a, b, err)`). Operation-specific failures (e.g.
    division by zero) return an `apperror` sentinel before `finish`.
 3. **Handler:** add `X` to the `Calculator` interface; in `constants.go` add the relative
-   `routeX = "/x"` and the full `PathX = PathAPI + PathV1 + routeX` (tests use it); in
+   `routeX = "/x"` and the full `pathX = pathAPI + pathV1 + routeX` (tests use it); in
    `calculator.go` add the method `func (h *calculatorHandler) x(c *gin.Context) { h.binary(c,
    h.calc.X) }` and register it in `registerHandlers` (`rg.POST(routeX, h.x)`). Add `X` to
    `fakeCalculator`.
