@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build: static Go binary ----
-FROM golang:1.27.3-alpine AS build
+FROM golang:1.27.4-alpine AS build
 WORKDIR /src
 
 # Dependencies first, so source edits don't invalidate the module cache layer.

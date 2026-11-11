@@ -13,7 +13,7 @@ Install the tools for the way you want to run the server.
 
 | Tool                   | Version                         | Needed for                                 |
 |------------------------|---------------------------------|--------------------------------------------|
-| [Go](https://go.dev/dl/) | **1.27.3** or newer (`go.mod`) | tests, vet, coverage, local builds         |
+| [Go](https://go.dev/dl/) | **1.27.4** or newer (`go.mod`) | tests, vet, coverage, local builds         |
 | Docker Engine          | 23+ (BuildKit on by default)    | running the server (development runs in Docker) |
 | Docker Compose         | v2.24+ (for `env_file.required` and `up --wait`) | `make up` / `docker compose up` |
 | GNU Make               | any                             | the `make` shortcuts                       |
@@ -21,7 +21,7 @@ Install the tools for the way you want to run the server.
 Check what you have:
 
 ```sh
-go version              # go version go1.27.3 ...
+go version              # go version go1.27.4 ...
 docker --version
 docker compose version
 ```
@@ -80,7 +80,7 @@ docker compose up --build              # add -d to run in the background
 docker compose down
 ```
 
-The image is built in two stages: a static binary on `golang:1.27.3-alpine`, run on
+The image is built in two stages: a static binary on `golang:1.27.4-alpine`, run on
 `alpine:3.24` as a non-root user. The image contains no config. Compose injects
 `backend/.env`, health-checks `/health` every 10s, and gives the server 15s to shut down
 gracefully.

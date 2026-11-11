@@ -1,6 +1,6 @@
 module fullstack-calculator/backend
 
-go 1.27.3
+go 1.27.4
 
 tool (
 	github.com/air-verse/air
