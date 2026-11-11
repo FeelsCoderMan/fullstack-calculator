@@ -660,3 +660,11 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **106.** Confirming the commit and push (the other Loki mentions, outside the READMEs, stay):
 
 > yes, commit and push
+
+**107.**
+
+> add assumptions section to readme after design decisions section
+
+**108.** Confirming the commit and push of the assumptions section:
+
+> yes

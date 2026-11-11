@@ -158,6 +158,39 @@ documents every endpoint with examples in [`backend/README.md`](backend/README.m
 
 All agreed conventions and decisions are in [`AGENTS.md`](AGENTS.md).
 
+## Assumptions
+
+What the project takes as given, where the assignment left it open:
+
+- **One operation at a time.** A calculation is two numbers and an operator (one number
+  for square root). There is no expression parser and no operator precedence; instead the
+  result carries over into the next calculation, like on a pocket calculator.
+- **Real numbers in float64.** Operands and results are 64-bit floats, the type the
+  browser uses anyway:
+  - integers above 2⁵³ lose precision (`9007199254740993` → `9007199254740992`), which is
+    accepted, not an error;
+  - values too small to represent (below about 2.5e-324, e.g. `1e-400`) become `0`;
+  - operands beyond ±1.797e308 are rejected as out of range, and a result that overflows
+    is an error;
+  - `-0` is always returned as `0`.
+- **Real results only.** No complex numbers: the square root of a negative number, and a
+  negative base with a fractional exponent (`(-8) ^ 0.5`), are errors. So is `0` raised to
+  a negative power, which would divide by zero.
+- **Percentage means "L percent of R"**: `20% of 50 = 10`, i.e. `L × R / 100`. It is not a
+  percentage change.
+- **Rounding is optional.** By default the full float64 result is returned. `precision`
+  (0–15 decimal places) rounds half away from zero, as on paper: `2.675` → `2.68`.
+- **Stateless and anonymous.** No accounts, authentication, persistence or calculation
+  history, so there is no database and no repository layer.
+- **English only**, but every user-facing text lives in `frontend/src/i18n`, so another
+  language means adding a file, not changing components.
+- **Local deployment.** The stack runs on one machine with Docker Compose, on ports 3000 and
+  8080, over plain HTTP. There is no TLS, rate limiting or production hardening beyond
+  request size limits (1 MiB bodies, JSON only), timeouts and non-root containers.
+- **Modern browsers.** The UI uses current CSS (`:has()`, `clip-path`) and supports widths
+  down to 320px, with one mobile breakpoint at 540px. Swagger UI loads from a CDN, so the
+  docs page needs internet access; the calculator itself does not.
+
 ## Repository layout
 
 ```
