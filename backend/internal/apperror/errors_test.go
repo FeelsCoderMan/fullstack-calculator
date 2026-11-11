@@ -148,6 +148,11 @@ func TestStackPointsAtCallSite(t *testing.T) {
 			},
 			wantFirst: "apperror.TestStackPointsAtCallSite.func2.1 apperror/errors_test.go:",
 		},
+		{
+			name:      "From with an error that has no code",
+			build:     func() *Error { return From(errDB) },
+			wantFirst: "apperror.TestStackPointsAtCallSite.func3 apperror/errors_test.go:",
+		},
 	}
 
 	for _, tt := range tests {

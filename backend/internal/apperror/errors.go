@@ -103,7 +103,8 @@ func Validation(fields ...FieldError) *Error {
 }
 
 // From returns the *Error in err's chain. An error without one is unexpected
-// and becomes Internal(err), with the stack captured here. From(nil) is nil.
+// and becomes an internal error like Internal(err), whose stack starts at
+// From's caller. From(nil) is nil.
 func From(err error) *Error {
 	if err == nil {
 		return nil
@@ -111,6 +112,9 @@ func From(err error) *Error {
 	if appErr, ok := errors.AsType[*Error](err); ok {
 		return appErr
 	}
+	// Not return Internal(err): capture skips a fixed number of frames
+	// (skipToCaller), so it must be called directly from the exported function,
+	// or the stack would start one frame too deep (TestStackPointsAtCallSite).
 	return &Error{Code: CodeInternal, cause: err, stack: capture()}
 }
 

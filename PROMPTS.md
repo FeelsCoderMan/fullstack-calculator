@@ -603,3 +603,15 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **94.** Confirming the F10/F11/F13/F14/F15 commit:
 
 > yes, commit it
+
+**95.** Re-running the audit after all "fix later" findings were done:
+
+> run quality-reviewer again for both parts
+
+**96.** Deciding on the second audit's findings:
+
+> fix B1, B2, B3; accept the rest
+
+**97.** Confirming the two commits (B2+B3 docs, then B1):
+
+> yes, commit them separately
