@@ -15,6 +15,8 @@ browser ──▶ frontend (nginx, :3000) ──/api, /swagger──▶ backend 
 This README covers running **both parts together**. Each part has its own README with the
 details: [`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md).
 
+Project is implemented in Linux/Fedora distribution and Claude Opus 5.5 is used.
+
 ## Requirements
 
 To run the app you only need Docker:
