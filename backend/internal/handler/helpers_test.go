@@ -46,8 +46,19 @@ func loadSpec(t *testing.T) *openapi3.T {
 }
 
 // newTestRouter is the real router with the real calculator.
-func newTestRouter() http.Handler {
-	return NewRouter(discardLogger(), service.NewCalculator())
+func newTestRouter(t *testing.T) http.Handler {
+	t.Helper()
+	return newRouterWith(t, service.NewCalculator())
+}
+
+// newRouterWith is the real router serving the operations with calc.
+func newRouterWith(t *testing.T, calc Calculator) http.Handler {
+	t.Helper()
+	router, err := NewRouter(discardLogger(), calc)
+	if err != nil {
+		t.Fatalf("NewRouter() error = %v", err)
+	}
+	return router
 }
 
 // serve sends a bodiless request through the real router and returns the
@@ -56,7 +67,7 @@ func serve(t *testing.T, method, path string) (*http.Request, *httptest.Response
 	t.Helper()
 	req := httptest.NewRequestWithContext(t.Context(), method, path, http.NoBody)
 	rec := httptest.NewRecorder()
-	newTestRouter().ServeHTTP(rec, req)
+	newTestRouter(t).ServeHTTP(rec, req)
 	return req, rec
 }
 

@@ -25,7 +25,7 @@ var ginParam = regexp.MustCompile(`:([A-Za-z0-9_]+)`)
 // registered API route must be documented, and every documented operation must
 // be registered.
 func TestRoutesMatchSpec(t *testing.T) {
-	router := newTestRouter()
+	router := newTestRouter(t)
 	engine, ok := router.(*gin.Engine)
 	if !ok {
 		t.Fatalf("NewRouter() = %T, want *gin.Engine", router)

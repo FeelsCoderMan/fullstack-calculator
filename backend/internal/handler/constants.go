@@ -13,8 +13,8 @@ const (
 	PathV1  = "/v1"
 )
 
-// Operation routes, relative to the /api/v1 group (routes.go registers them
-// there).
+// Operation routes, relative to the /api/v1 group
+// (calculatorHandler.registerHandlers registers them there).
 const (
 	routeAdd        = "/add"
 	routeSubtract   = "/subtract"
@@ -36,15 +36,28 @@ const (
 	PathSqrt       = PathAPI + PathV1 + routeSqrt
 )
 
-// Request body limits and properties.
-const (
-	// maxBodyBytes is the largest accepted request body (1 MiB).
-	maxBodyBytes = 1 << 20
+// maxBodyBytes is the largest accepted request body (1 MiB).
+const maxBodyBytes = 1 << 20
 
-	fieldLeftOperand  = "leftOperand"
-	fieldRightOperand = "rightOperand"
-	fieldOperand      = "operand"
-	fieldPrecision    = "precision"
+// Struct tags of request types (request.go).
+const (
+	tagKeyJSON       = "json"
+	tagKeyBinding    = "binding"
+	jsonTagSeparator = ","
+	ruleParamSep     = "="
+	jsonTagSkip      = "-"
+)
+
+// Binding rules used in request types. omitempty, required, min and max are
+// validator built-ins; jsonnumber, finite and integer are registered by newValidator.
+const (
+	tagOmitEmpty  = "omitempty"
+	tagRequired   = "required"
+	tagMin        = "min"
+	tagMax        = "max"
+	tagJSONNumber = "jsonnumber"
+	tagFinite     = "finite"
+	tagInteger    = "integer"
 )
 
 // bitSize makes strconv parse numbers as float64.

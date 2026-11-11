@@ -54,7 +54,7 @@ func testEnv(overrides map[string]string) func(string) string {
 
 // fixedHandler ignores the logger factory and serves h.
 func fixedHandler(h http.Handler) handlerFactory {
-	return func(*logger.Factory) http.Handler { return h }
+	return func(*logger.Factory) (http.Handler, error) { return h, nil }
 }
 
 // startServer builds an App from testEnv(env) (a random port unless env overrides PORT), runs it
@@ -249,12 +249,25 @@ func TestRunShutdown(t *testing.T) {
 	}
 }
 
+// errTestHandler is what a failing handlerFactory returns.
+var errTestHandler = errors.New("test handler")
+
 func TestNewAppStartupErrors(t *testing.T) {
 	tests := []struct {
-		name    string
-		env     func(t *testing.T) map[string]string
-		wantErr error
+		name       string
+		env        func(t *testing.T) map[string]string
+		newHandler handlerFactory // nil means the real newRouter
+		wantErr    error
 	}{
+		{
+			name: "handler fails to build, with log files open",
+			env: func(t *testing.T) map[string]string {
+				t.Helper()
+				return map[string]string{"LOG_TO_FILE": "true", "LOG_DIR": t.TempDir()}
+			},
+			newHandler: func(*logger.Factory) (http.Handler, error) { return nil, errTestHandler },
+			wantErr:    errTestHandler,
+		},
 		{
 			name: "invalid port",
 			env: func(*testing.T) map[string]string {
@@ -317,7 +330,11 @@ func TestNewAppStartupErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app, err := newApp(testEnv(tt.env(t)), io.Discard, newRouter)
+			newHandler := tt.newHandler
+			if newHandler == nil {
+				newHandler = newRouter
+			}
+			app, err := newApp(testEnv(tt.env(t)), io.Discard, newHandler)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("newApp() error = %v, want %v", err, tt.wantErr)
 			}

@@ -317,7 +317,7 @@ func TestAdd(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathAdd, tt.contentType, tt.body)
@@ -421,7 +421,7 @@ func TestSubtract(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathSubtract, tt.contentType, tt.body)
@@ -539,7 +539,7 @@ func TestMultiply(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathMultiply, tt.contentType, tt.body)
@@ -706,7 +706,7 @@ func TestDivide(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathDivide, tt.contentType, tt.body)
@@ -852,7 +852,7 @@ func TestPower(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathPower, tt.contentType, tt.body)
@@ -977,7 +977,7 @@ func TestPercentage(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathPercentage, tt.contentType, tt.body)
@@ -1200,7 +1200,7 @@ func TestSqrt(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, rec := serveJSON(t, router, PathSqrt, tt.contentType, tt.body)
@@ -1319,7 +1319,7 @@ func TestOperationsNeverReturnNegativeZero(t *testing.T) {
 		},
 	}
 
-	router := newTestRouter()
+	router := newTestRouter(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, rec := serveJSON(t, router, tt.path, binding.MIMEJSON, tt.body)
@@ -1417,7 +1417,7 @@ func TestOperationServiceErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := NewRouter(discardLogger(), fakeCalculator{err: tt.err})
+			router := newRouterWith(t, fakeCalculator{err: tt.err})
 			for _, op := range operations {
 				t.Run(op.name, func(t *testing.T) {
 					req, rec := serveJSON(t, router, op.path, binding.MIMEJSON, op.body)

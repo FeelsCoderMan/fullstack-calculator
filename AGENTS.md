@@ -258,18 +258,27 @@ HTTP request → handler → service → repository
 ### Rules
 
 - Routing with [gin](https://github.com/gin-gonic/gin), confined to `internal/handler`.
-  `handler.NewRouter` returns an `http.Handler`, so `internal/server` stays framework-agnostic
+  `handler.NewRouter` returns an `http.Handler` (and an error), so `internal/server` stays framework-agnostic
   and keeps owning `http.Server` (timeouts, graceful shutdown). Don't use `engine.Run()`.
   - Build the engine with `gin.New()`, never `gin.Default()`. Gin's logger and recovery
     middleware write plain text. `RequestLogger` writes the request records and recovers
     panics itself (`backend/docs/logging.md`).
   - `gin.SetMode(gin.ReleaseMode)`, so gin's debug output never pollutes the JSON log stream.
   - `HandleMethodNotAllowed = true`, so a wrong method returns 405, not 404.
-- Other dependencies need a reason (e.g. test-only OpenAPI validation).
+- Other dependencies need a reason (e.g. test-only OpenAPI validation, validator/v10 for
+  declarative request rules).
 - `float64` arithmetic. Never return `NaN`/`±Inf`; map them to the codes above.
-- Distinguish a missing operand from `0`. To report **all** field errors, decode the body into
-  `map[string]json.RawMessage` and validate each field (required / type / range / unknown).
-  Don't rely on `json.Decoder` errors, which stop at the first problem.
+- Request validation uses [validator/v10](https://github.com/go-playground/validator)
+  (confined to `internal/handler`). Each endpoint has its own request struct
+  (`internal/handler/request.go`) whose `binding` tags declare the rules
+  (`required,jsonnumber,finite`, `omitempty,...,integer,min=0,max=15`), and binds it with
+  `bindJSON[T]` (`bind.go`). A failed bind is either a request error (415/413/400) or one
+  validation error (422) listing **all** field problems. Every rule maps to a field code in
+  `validationTagCodes` (`TestValidationTagsHaveCodes`).
+- Distinguish a missing operand from `0`, and report **all** field errors: operands are the
+  `number` type, whose `UnmarshalJSON` never fails (a failing one would stop `encoding/json`
+  at the first bad property). Property names match exactly (case-sensitive), and unknown
+  properties are reported alphabetically after the struct's fields.
 - Limit body size with `http.MaxBytesReader`. Reject trailing data after the JSON object.
 - Never put internal error details in responses. Log them server-side (see [Logging](#logging-backend)).
 - Config via env vars in `internal/config`, one loader per concern (`config.LoadServer`,

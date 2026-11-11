@@ -3,6 +3,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -17,7 +18,12 @@ import (
 // not gin.Default: gin's own logger and recovery middleware write plain text,
 // while RequestLogger writes one JSON record per request and recovers panics
 // itself (docs/logging.md).
-func NewRouter(accessLog *slog.Logger, calc Calculator) http.Handler {
+func NewRouter(accessLog *slog.Logger, calc Calculator) (http.Handler, error) {
+	validate, err := newValidator()
+	if err != nil {
+		return nil, fmt.Errorf("new validator: %w", err)
+	}
+
 	// Debug mode prints plain-text route listings and warnings to stdout,
 	// which would break the JSON-lines log stream.
 	gin.SetMode(gin.ReleaseMode)
@@ -32,18 +38,11 @@ func NewRouter(accessLog *slog.Logger, calc Calculator) http.Handler {
 
 	// Calculator operations: /api/v1/<operation>. A breaking change gets a new
 	// version group (/api/v2) next to this one instead of changing it.
-	api := r.Group(PathAPI)
-	v1 := api.Group(PathV1)
-	v1.POST(routeAdd, binary(calc.Add))
-	v1.POST(routeSubtract, binary(calc.Subtract))
-	v1.POST(routeMultiply, binary(calc.Multiply))
-	v1.POST(routeDivide, binary(calc.Divide))
-	v1.POST(routePower, binary(calc.Power))
-	v1.POST(routePercentage, binary(calc.Percentage))
-	v1.POST(routeSqrt, unary(calc.Sqrt))
+	v1 := r.Group(PathAPI).Group(PathV1)
+	newCalculatorHandler(calc, validate).registerHandlers(v1)
 
 	// API documentation: Swagger UI and the raw spec (api/openapi.yaml).
 	r.GET(PathSwaggerUI, SwaggerUI)
 	r.GET(PathSwaggerSpec, OpenAPISpec)
-	return r
+	return r, nil
 }

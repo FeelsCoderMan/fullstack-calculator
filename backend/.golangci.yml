@@ -49,6 +49,8 @@ linters:
           deny:
             - pkg: github.com/gin-gonic/gin
               desc: "gin is confined to internal/handler (AGENTS.md Decision 8)"
+            - pkg: github.com/go-playground/validator
+              desc: "request validation is confined to internal/handler"
 
     errcheck:
       check-type-assertions: true

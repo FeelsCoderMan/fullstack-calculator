@@ -56,9 +56,17 @@ catches rounding that produces `-0` (e.g. `-0.001` at precision 2).
 
 ## 4. Field validation
 
-Decode the body into `map[string]json.RawMessage`, check every field, and report all
-problems at once, in a fixed order (`leftOperand`, `rightOperand`, `precision`, then
-unknown keys).
+Each endpoint binds its own request struct (`internal/handler/request.go`) with
+`bindJSON[T]` (`bind.go`): the `binding` tags (validator/v10) declare the rules, and every
+problem is reported at once, in a fixed order (the struct's fields in declaration order:
+`leftOperand`, `rightOperand`, `precision`, then unknown keys alphabetically). Property
+names are case-sensitive: `LEFTOPERAND` is unknown, not `leftOperand`.
+
+| Rule | Field code |
+|---|---|
+| `required` | `error.field.required` |
+| `jsonnumber`, `integer` | `error.field.invalid.type` |
+| `finite`, `min`, `max` | `error.field.out.of.range` |
 
 | Raw value | Field code |
 |---|---|
@@ -134,13 +142,14 @@ Every two-operand operation shares the same contract; only the arithmetic differ
 - **Request:** `BinaryOperationRequest`, `{"leftOperand", "rightOperand", "precision"?}`.
 - **Responses:** 200 `{"result"}`, 400 invalid JSON, 413, 415, 422 (field-error array or a
   math `{code}`), 500. Same response `$ref`s in the spec for every operation.
-- **Validation:** one shared handler, `decodeBinaryRequest` (sections 4 and 5). It is fully
-  tested once, in `TestAdd`; each other operation's HTTP test keeps a few rows that prove its
+- **Validation:** one shared request type, `binaryRequest`, bound with `bindJSON` (sections 4
+  and 5). It is fully tested once, in `TestAdd`; each other operation's HTTP test keeps a few rows that prove its
   route uses it.
 - **Result check:** the shared service helper `finish` (section 3): no NaN/±Inf, rounding,
   no `-0`.
-- **Handler:** one generic `binary(op)` serves every operation; the route is
-  `v1.POST(routeX, binary(calc.X))` in the `/api/v1` route group.
+- **Handler:** `calculatorHandler` has one method per operation (`h.add`, ...), each a call
+  to the shared `h.binary(c, h.calc.X)`; `registerHandlers` registers them on the `/api/v1`
+  route group (`rg.POST(routeX, h.x)`), and `NewRouter` calls it.
 
 ### 6.1 Implemented operations
 
@@ -252,8 +261,9 @@ Notes per operation:
    division by zero) return an `apperror` sentinel before `finish`.
 3. **Handler:** add `X` to the `Calculator` interface; in `constants.go` add the relative
    `routeX = "/x"` and the full `PathX = PathAPI + PathV1 + routeX` (tests use it); in
-   `routes.go` register `v1.POST(routeX, binary(calc.X))` in the `/api/v1` group. Add `X`
-   to `fakeCalculator`.
+   `calculator.go` add the method `func (h *calculatorHandler) x(c *gin.Context) { h.binary(c,
+   h.calc.X) }` and register it in `registerHandlers` (`rg.POST(routeX, h.x)`). Add `X` to
+   `fakeCalculator`.
 4. **Tests:** a service `TestX` table (results, operand order, rounding, overflow in both
    directions, `-0`, any operation-specific error); a handler `TestX` table (results, math
    errors, a few validation rows); add rows to `TestOperationsNeverReturnNegativeZero` and
@@ -462,14 +472,16 @@ Decisions (made with the project owner):
   decimal operands alike (`-4`, `-2.5`, `-1e-320`). Checked before computing, because
   `math.Sqrt(-4)` is NaN, which would be reported as undefined. `-0` is not negative: its
   root is `0`.
-- **Validation:** its own decoder, `decodeUnaryRequest`, reports every problem at once in
-  the order `operand`, `precision`, then unknown properties alphabetically. Two-operand
+- **Validation:** its own request type, `sqrtRequest`, bound with `bindJSON`, reports every
+  problem at once in the order `operand`, `precision`, then unknown properties
+  alphabetically. Two-operand
   fields (`leftOperand`) are unknown here.
 - **Adding another one-operand operation:** follow 6.2, with these differences: the spec
   uses `UnaryOperationRequest`; the service method is `X(x float64, p Precision)`; the
-  route is `v1.POST(routeX, unary(calc.X))`; the `operations` row in
+  handler method binds its own request type (like `h.sqrt`); the `operations` row in
   `TestOperationServiceErrors` needs a one-operand `body`; and if the operand needs a rule
-  beyond "a number" (e.g. whole numbers only), add a field reader for it in `decode.go`.
+  beyond "a number" (e.g. whole numbers only), add it to the field's `binding` tag (a new
+  custom rule is registered in `newValidator` and mapped in `validationTagCodes`).
 
 Limits:
 

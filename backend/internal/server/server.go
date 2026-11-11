@@ -22,9 +22,9 @@ import (
 )
 
 // handlerFactory builds the root HTTP handler from the configured loggers.
-type handlerFactory func(logs *logger.Factory) http.Handler
+type handlerFactory func(logs *logger.Factory) (http.Handler, error)
 
-func newRouter(logs *logger.Factory) http.Handler {
+func newRouter(logs *logger.Factory) (http.Handler, error) {
 	return handler.NewRouter(logs.Logger(logger.CategoryHTTP), service.NewCalculator())
 }
 
@@ -72,14 +72,15 @@ func newApp(getenv func(string) string, stdout io.Writer, newHandler handlerFact
 		serverLog.LogAttrs(context.Background(), slog.LevelWarn, msgFileLoggingEnabled, logger.Dir(logCfg.Dir))
 	}
 
+	h, err := newHandler(logs)
+	if err != nil {
+		return nil, closeLogs(logs, fmt.Errorf("build handler: %w", err))
+	}
+
 	var lc net.ListenConfig
 	ln, err := lc.Listen(context.Background(), network, serverCfg.Addr())
 	if err != nil {
-		err = fmt.Errorf("listen on %s: %w", serverCfg.Addr(), err)
-		if closeErr := logs.Close(); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("close log files: %w", closeErr))
-		}
-		return nil, err
+		return nil, closeLogs(logs, fmt.Errorf("listen on %s: %w", serverCfg.Addr(), err))
 	}
 
 	return &App{
@@ -88,7 +89,7 @@ func newApp(getenv func(string) string, stdout io.Writer, newHandler handlerFact
 		serverLog:       serverLog,
 		ln:              ln,
 		srv: &http.Server{
-			Handler:           newHandler(logs),
+			Handler:           h,
 			ReadHeaderTimeout: readHeaderTimeout,
 			ReadTimeout:       readTimeout,
 			WriteTimeout:      writeTimeout,
@@ -96,6 +97,15 @@ func newApp(getenv func(string) string, stdout io.Writer, newHandler handlerFact
 			ErrorLog:          slog.NewLogLogger(logs.Logger(logger.CategoryHTTP).Handler(), slog.LevelError),
 		},
 	}, nil
+}
+
+// closeLogs closes the log files after a failed startup and returns err,
+// joined with the close error if there is one.
+func closeLogs(logs *logger.Factory, err error) error {
+	if closeErr := logs.Close(); closeErr != nil {
+		return errors.Join(err, fmt.Errorf("close log files: %w", closeErr))
+	}
+	return err
 }
 
 // Addr returns the bound listen address (useful with PORT=0).
