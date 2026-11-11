@@ -220,7 +220,9 @@ Accessibility:
 - The result display is an `<output aria-live="polite">`, so screen readers announce each
   result or error. It's marked `aria-busy` while a request is in flight.
 - Everything works by keyboard: *Enter* in any field, or `=` in a number field, calculates.
-  Focus rings are always visible. The **=** button's accessible name is *Calculate*.
+  Focus rings are always visible. The **=** button's accessible name is *= Calculate*: it
+  starts with the visible "=" (WCAG 2.5.3 Label in Name), so "click equals" works with
+  speech control, and the hidden word says what it does.
 
 ## Conventions
 
@@ -268,10 +270,11 @@ frontend/
 │   │   ├── field/            # Field.tsx, Field.module.css
 │   │   ├── operation-picker/ # OperationPicker.tsx, OperationPicker.module.css
 │   │   └── result-display/   # ResultDisplay.tsx, ResultDisplay.module.css
+│   ├── styles/               # shared text styles, composed into component CSS (composes:)
 │   ├── utils/                # input validation, class name / aria id helpers
 │   ├── test/setup.ts         # jest-dom matchers, cleanup between tests
 │   ├── App.tsx               # page shell: header, calculator, footer link to Swagger UI
-│   ├── index.css             # design tokens (light/dark) and base styles
+│   ├── index.css             # design tokens (colors, spacing, type scale, focus ring, motion) and base styles
 │   └── main.tsx              # entry point
 ├── index.html
 ├── nginx.conf                # static files + /api and /swagger reverse proxy (Docker)

@@ -11,10 +11,27 @@ vi.mock('@/api/client', async (importOriginal) => {
 
 const calculateMock = vi.mocked(calculate)
 
+/** Accessible name of the "=" key: the visible "=" plus the hidden word "Calculate". */
+const CALCULATE = '= Calculate'
+
+type User = ReturnType<typeof userEvent.setup>
+
 function setup() {
   const user = userEvent.setup()
   render(<Calculator />)
   return { user, display: screen.getByRole('status') }
+}
+
+/** Types both operands of the default (two-operand) form. */
+async function enterOperands(user: User, left: string, right: string) {
+  await user.type(screen.getByLabelText('First number'), left)
+  await user.type(screen.getByLabelText('Second number'), right)
+}
+
+/** Types both operands and presses "=". */
+async function calculateWith(user: User, left: string, right: string) {
+  await enterOperands(user, left, right)
+  await user.click(screen.getByRole('button', { name: CALCULATE }))
 }
 
 beforeEach(() => {
@@ -26,9 +43,7 @@ describe('Calculator', () => {
     calculateMock.mockResolvedValue({ kind: 'success', result: 7 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '3')
-    await user.type(screen.getByLabelText('Second number'), '4')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '3', '4')
 
     expect(await screen.findByText('7')).toBeInTheDocument()
     expect(display).toHaveTextContent('3 + 4 =7')
@@ -41,9 +56,7 @@ describe('Calculator', () => {
       .mockResolvedValueOnce({ kind: 'success', result: 54 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '15')
-    await user.type(screen.getByLabelText('Second number'), '12')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '15', '12')
     await waitFor(() => expect(display).toHaveTextContent('15 + 12 =27'))
 
     expect(screen.getByLabelText('First number')).toHaveValue('27')
@@ -53,7 +66,7 @@ describe('Calculator', () => {
     await user.click(screen.getByRole('radio', { name: 'Multiply' }))
     expect(display).toHaveTextContent('15 + 12 =27')
     await user.type(screen.getByLabelText('Second number'), '2')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
 
     await waitFor(() => expect(display).toHaveTextContent('27 × 2 =54'))
     expect(calculateMock).toHaveBeenLastCalledWith(
@@ -68,35 +81,34 @@ describe('Calculator', () => {
     calculateMock.mockResolvedValue({ kind: 'success', result: 27 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '15')
-    await user.type(screen.getByLabelText('Second number'), '12=')
+    await enterOperands(user, '15', '12=')
 
     await waitFor(() => expect(display).toHaveTextContent('15 + 12 =27'))
     expect(calculateMock).toHaveBeenCalledWith('add', { leftOperand: 15, rightOperand: 12 }, expect.any(AbortSignal))
   })
 
-  it('carries a square root into the single input', async () => {
-    calculateMock.mockResolvedValue({ kind: 'success', result: 3 })
-    const { user, display } = setup()
+  const squareRoots = [
+    { name: 'typing "=" in the field', typed: '9=', result: 3, wantOperand: 9, wantDisplay: '√9 =3' },
+    { name: 'a decimal operand', typed: '2.25=', result: 1.5, wantOperand: 2.25, wantDisplay: '√2.25 =1.5' },
+    { name: 'pressing Enter', typed: '9{Enter}', result: 3, wantOperand: 9, wantDisplay: '√9 =3' },
+  ] as const
 
-    await user.click(screen.getByRole('radio', { name: 'Square root' }))
-    await user.type(screen.getByLabelText('Number'), '9=')
+  it.each(squareRoots)(
+    'takes a square root from a single input and carries the result: $name',
+    async ({ typed, result, wantOperand, wantDisplay }) => {
+      calculateMock.mockResolvedValue({ kind: 'success', result })
+      const { user, display } = setup()
 
-    await waitFor(() => expect(display).toHaveTextContent('√9 =3'))
-    expect(screen.getByLabelText('Number')).toHaveValue('3')
-    expect(screen.getByLabelText('Number')).toHaveFocus()
-  })
+      await user.click(screen.getByRole('radio', { name: 'Square root' }))
+      expect(screen.queryByLabelText('Second number')).not.toBeInTheDocument()
+      await user.type(screen.getByLabelText('Number'), typed)
 
-  it('takes the square root of a decimal', async () => {
-    calculateMock.mockResolvedValue({ kind: 'success', result: 1.5 })
-    const { user, display } = setup()
-
-    await user.click(screen.getByRole('radio', { name: 'Square root' }))
-    await user.type(screen.getByLabelText('Number'), '2.25=')
-
-    await waitFor(() => expect(display).toHaveTextContent('√2.25 =1.5'))
-    expect(calculateMock).toHaveBeenCalledWith('sqrt', { operand: 2.25 }, expect.any(AbortSignal))
-  })
+      await waitFor(() => expect(display).toHaveTextContent(wantDisplay))
+      expect(calculateMock).toHaveBeenCalledWith('sqrt', { operand: wantOperand }, expect.any(AbortSignal))
+      expect(screen.getByLabelText('Number')).toHaveValue(result.toString())
+      expect(screen.getByLabelText('Number')).toHaveFocus()
+    },
+  )
 
   it('carries a decimal result into square root', async () => {
     calculateMock
@@ -104,11 +116,10 @@ describe('Calculator', () => {
       .mockResolvedValueOnce({ kind: 'success', result: 1.5 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '2')
-    await user.type(screen.getByLabelText('Second number'), '0.25=')
+    await enterOperands(user, '2', '0.25=')
     await waitFor(() => expect(display).toHaveTextContent('2 + 0.25 =2.25'))
     await user.click(screen.getByRole('radio', { name: 'Square root' }))
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
 
     await waitFor(() => expect(display).toHaveTextContent('√2.25 =1.5'))
     expect(calculateMock).toHaveBeenLastCalledWith('sqrt', { operand: 2.25 }, expect.any(AbortSignal))
@@ -159,7 +170,7 @@ describe('Calculator', () => {
     const { user } = setup()
 
     await user.type(screen.getByLabelText('Second number'), 'abc')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
 
     const left = screen.getByLabelText('First number')
     const right = screen.getByLabelText('Second number')
@@ -174,7 +185,7 @@ describe('Calculator', () => {
   it('clears a field error when the field is edited', async () => {
     const { user } = setup()
 
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
     await user.type(screen.getByLabelText('First number'), '1')
 
     expect(screen.getByLabelText('First number')).not.toHaveAttribute('aria-invalid')
@@ -189,9 +200,7 @@ describe('Calculator', () => {
     })
     const { user } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '2')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '2')
 
     const right = screen.getByLabelText('Second number')
     await waitFor(() => expect(right).toHaveAttribute('aria-invalid', 'true'))
@@ -207,9 +216,7 @@ describe('Calculator', () => {
     })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '2')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '2')
 
     await waitFor(() => expect(display).toHaveTextContent('The server did not expect this value.'))
     expect(display).toHaveTextContent('Reference: R7')
@@ -257,9 +264,7 @@ describe('Calculator', () => {
     calculateMock.mockResolvedValue(outcome)
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '0')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '0')
 
     await waitFor(() => expect(display).toHaveTextContent(want))
   })
@@ -268,24 +273,9 @@ describe('Calculator', () => {
     calculateMock.mockResolvedValue({ kind: 'failure', code: 'error.internal', requestId: 'ABC-123' })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '2')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '2')
 
     await waitFor(() => expect(display).toHaveTextContent('Reference: ABC-123'))
-  })
-
-  it('asks for a single number for square root', async () => {
-    calculateMock.mockResolvedValue({ kind: 'success', result: 3 })
-    const { user, display } = setup()
-
-    await user.click(screen.getByRole('radio', { name: 'Square root' }))
-    expect(screen.queryByLabelText('Second number')).not.toBeInTheDocument()
-    await user.type(screen.getByLabelText('Number'), '9')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
-
-    await waitFor(() => expect(display).toHaveTextContent('√9 =3'))
-    expect(calculateMock).toHaveBeenCalledWith('sqrt', { operand: 9 }, expect.any(AbortSignal))
   })
 
   it('shows only the answer to the latest request', async () => {
@@ -295,13 +285,11 @@ describe('Calculator', () => {
       .mockResolvedValueOnce({ kind: 'success', result: 20 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '1')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '1')
     expect(display).toHaveTextContent('Calculating…')
     await user.clear(screen.getByLabelText('First number'))
     await user.type(screen.getByLabelText('First number'), '19')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
     await waitFor(() => expect(display).toHaveTextContent('19 + 1 =20'))
 
     // Let the stale answer settle completely before asserting it was ignored.
@@ -318,9 +306,7 @@ describe('Calculator', () => {
     calculateMock.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '1')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '1')
     await user.click(screen.getByRole('radio', { name: 'Multiply' }))
     await act(async () => {
       resolveFirst({ kind: 'success', result: 2 })
@@ -335,9 +321,7 @@ describe('Calculator', () => {
     const user = userEvent.setup()
     const { unmount } = render(<Calculator />)
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '1')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '1')
     unmount()
 
     expect(calculateMock.mock.calls[0]?.[2]?.aborted).toBe(true)
@@ -347,12 +331,10 @@ describe('Calculator', () => {
     calculateMock.mockResolvedValue({ kind: 'success', result: 3 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '2')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '2')
     await waitFor(() => expect(display).toHaveTextContent('1 + 2 =3'))
     await user.clear(screen.getByLabelText('Second number'))
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
 
     expect(screen.getByLabelText('Second number')).toHaveAttribute('aria-invalid', 'true')
     expect(display).toHaveTextContent('1 + 2 =3')
@@ -366,10 +348,9 @@ describe('Calculator', () => {
     })
     const { user } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '2')
+    await enterOperands(user, '1', '2')
     await user.selectOptions(screen.getByLabelText('Decimal places'), '3 places')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await user.click(screen.getByRole('button', { name: CALCULATE }))
 
     const precision = screen.getByLabelText('Decimal places')
     await waitFor(() => expect(precision).toHaveAttribute('aria-invalid', 'true'))
@@ -380,9 +361,7 @@ describe('Calculator', () => {
     calculateMock.mockResolvedValue({ kind: 'success', result: 3 })
     const { user, display } = setup()
 
-    await user.type(screen.getByLabelText('First number'), '1')
-    await user.type(screen.getByLabelText('Second number'), '2')
-    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+    await calculateWith(user, '1', '2')
     await waitFor(() => expect(display).toHaveTextContent('1 + 2 =3'))
     await user.click(screen.getByRole('button', { name: 'Clear' }))
 

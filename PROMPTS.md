@@ -595,3 +595,11 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **92.** Confirming the two backend commits (B6 rename, then B1+B2):
 
 > yes, commit them separately
+
+**93.** Picking the remaining frontend findings to fix:
+
+> fix F10, F11, F13, F14, F15
+
+**94.** Confirming the F10/F11/F13/F14/F15 commit:
+
+> yes, commit it

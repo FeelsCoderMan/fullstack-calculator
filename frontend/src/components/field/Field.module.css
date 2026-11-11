@@ -1,14 +1,13 @@
 .field {
   display: flex;
   flex-direction: column;
+  /* Calculator.module.css offsets its operator symbol by the label height plus this gap. */
   gap: var(--space-1);
   min-width: 0;
 }
 
 .label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  composes: label from '@/styles/typography.module.css';
 }
 
 /* Shared look of the controls rendered inside a field (inputs and selects). */
@@ -20,11 +19,11 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   /* 16px or more stops iOS Safari from zooming into a focused input. */
-  font-size: 1.125rem;
+  font-size: var(--font-size-lg);
   font-variant-numeric: tabular-nums;
   transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 
 .control:hover {
@@ -59,7 +58,7 @@
 }
 
 .error {
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--color-danger);
 }

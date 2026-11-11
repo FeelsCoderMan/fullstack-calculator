@@ -34,7 +34,7 @@
 .footer {
   margin-top: auto;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
 }
 
 .link {

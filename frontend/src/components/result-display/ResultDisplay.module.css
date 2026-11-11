@@ -9,7 +9,7 @@
 }
 
 .heading {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -37,7 +37,7 @@
 .expression {
   max-width: 100%;
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: var(--font-size-md);
   color: var(--color-on-display-muted);
   overflow-wrap: anywhere;
 }
@@ -54,20 +54,20 @@
 }
 
 .errorHeading {
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-on-display-muted);
 }
 
 .error {
-  font-size: 1.125rem;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-on-display-danger);
 }
 
 .reference {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: var(--color-on-display-muted);
   overflow-wrap: anywhere;
 }

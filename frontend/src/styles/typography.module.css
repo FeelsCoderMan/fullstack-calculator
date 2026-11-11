@@ -1,0 +1,9 @@
+/* Shared text styles, composed into component styles with `composes:`. */
+
+/* The label above a form control, and the legend of a group of controls. */
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: var(--line-height-body);
+  color: var(--color-text-muted);
+}

@@ -6,11 +6,9 @@
 }
 
 .legend {
+  composes: label from '@/styles/typography.module.css';
   padding: 0;
   margin-bottom: var(--space-2);
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
 }
 
 .grid {
@@ -34,9 +32,9 @@
   cursor: pointer;
   text-align: center;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease;
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -62,8 +60,8 @@
 }
 
 .tile:has(.radio:focus-visible) {
-  outline: 3px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-accent);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .symbol {
@@ -73,7 +71,7 @@
 }
 
 .name {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 1.2;
   /* Break long names only at hyphenation points (html lang="en"), never mid-syllable. */

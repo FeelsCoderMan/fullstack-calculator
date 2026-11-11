@@ -31,6 +31,21 @@
   --space-6: 2rem;
   --tap-target: 2.75rem;
 
+  /* Type scale. One-off sizes stay local to their component. */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --line-height-body: 1.5;
+
+  /* Focus ring of buttons, links and tiles (form controls draw a tighter one). */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  /* Hover and state transitions. Stopped under prefers-reduced-motion below. */
+  --duration-fast: 120ms;
+
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 
@@ -75,8 +90,8 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -94,8 +109,8 @@ select {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-accent);
+  outline-offset: var(--focus-ring-offset);
 }
 
 @media (prefers-reduced-motion: reduce) {

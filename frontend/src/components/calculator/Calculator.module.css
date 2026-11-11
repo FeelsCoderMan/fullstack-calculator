@@ -34,15 +34,17 @@
   place-items: center;
   min-width: 2.5rem;
   height: var(--tap-target);
-  font-size: 1.5rem;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   color: var(--color-accent);
 }
 
-/* Fields with an error message grow; keep the symbol on the input line. */
+/* Fields with an error message grow; keep the symbol on the input line. It sits
+   below the field's label: one line of the shared label style
+   (styles/typography.module.css) plus the field's gap (Field.module.css). */
 .operands:has([aria-invalid='true']) .symbol {
   align-self: start;
-  margin-top: 1.5rem;
+  margin-top: calc(var(--font-size-sm) * var(--line-height-body) + var(--space-1));
 }
 
 .footer {
@@ -72,8 +74,8 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -88,8 +90,19 @@
 }
 
 .equals {
-  font-size: 1.5rem;
+  font-size: var(--font-size-xl);
   line-height: 1;
+}
+
+/* In the accessibility tree, invisible on screen. */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .primary[aria-busy='true'] {

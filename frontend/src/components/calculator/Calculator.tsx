@@ -115,15 +115,18 @@ export function Calculator() {
             <button type="button" className={cx(styles.button, styles.secondary)} onClick={handleClear}>
               {t.form.clear}
             </button>
-            {/* Shows "=" like a calculator key; named "Calculate" for assistive tech. */}
+            {/* Shows "=" like a calculator key. The hidden word makes the accessible
+                name "= Calculate": it starts with the visible label, so a speech-control
+                user can say "click equals" (WCAG 2.5.3 Label in Name). Don't move the
+                name back into aria-label. The title tooltip explains "=" to mouse users;
+                some screen readers also read it as the description, which is accepted. */}
             <button
               type="submit"
               className={cx(styles.button, styles.primary, styles.equals)}
-              aria-label={t.form.calculate}
               title={t.form.calculate}
               aria-busy={loading}
             >
-              {t.form.equals}
+              {t.form.equals} <span className={styles.visuallyHidden}>{t.form.calculate}</span>
             </button>
           </div>
         </div>
