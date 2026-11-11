@@ -52,7 +52,8 @@ request ─▶ RequestLogger ─▶ (gin routing) ─▶ handler ─▶ service
               │                       writeError(c, err)
               │                         ├─ apperror.From(err) → *apperror.Error (code, stack)
               │                         ├─ middleware.RecordFailure(c, {err, appErr, code})
-              │                         └─ c.JSON(status(code), {"code": ...})
+              │                         └─ c.AbortWithStatusJSON(statusFor(code), errorBody(code, fields))
+              │                              ({"code": ...}, or the bare field-error array for 422)
               ▼
    after c.Next(): one record ── level from status, plus code / error / stack if attached
 ```
@@ -117,7 +118,7 @@ Examples (formatted here; on stdout each is one line):
 {"time":"…","level":"ERROR","msg":"request completed","service":"calculator-backend","logger":"http",
  "method":"POST","path":"/api/v1/power","status":500,"duration_ms":1.9,"request_id":"c07e…",
  "code":"error.internal","error":"power: compute result: unexpected state",
- "stack":["service.(*Calculator).Power service/calculator.go:77","handler.(*Calc).Power handler/calc.go:51", "…"]}
+ "stack":["service.(*Calculator).Power service/calculator.go:95","handler.(*calculatorHandler).binary handler/calculator.go:78", "…"]}
 ```
 
 ## 5. Levels

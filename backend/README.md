@@ -161,13 +161,13 @@ and the reasoning behind each operation are in [`docs/operations.md`](docs/opera
 
 ### Adding an endpoint
 
-1. Describe it in `api/openapi.yaml`: path, request body, and every response status with
-   its schema.
-2. Add its request type to `internal/handler/request.go` (with `binding` rules), implement
-   the handler method, and register the route in `registerHandlers`
-   (`internal/handler/calculator.go`).
-3. Test it with `httptest`, and call `assertMatchesSpec(t, req, rec)` on each response.
-   `TestRoutesMatchSpec` fails if the router and the spec disagree.
+Spec first: describe the endpoint in `api/openapi.yaml` (path, request body, and every
+response status with its schema) before writing any code. The full checklist (spec,
+service, handler, tests, docs) lives in one place,
+[`docs/operations.md`](docs/operations.md): section 6.2 for a two-operand operation and
+section 7 for a one-operand one. Two tests keep you honest: `TestRoutesMatchSpec` fails if
+the router and the spec disagree, and `assertMatchesSpec` checks every handler response
+against the spec.
 
 The Swagger UI page loads `swagger-ui-dist` 5.34.0 from jsDelivr, pinned with integrity
 hashes, so the browser needs internet access. The API itself does not.

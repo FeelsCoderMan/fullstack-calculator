@@ -478,7 +478,11 @@ Decisions (made with the project owner):
   fields (`leftOperand`) are unknown here.
 - **Adding another one-operand operation:** follow 6.2, with these differences: the spec
   uses `UnaryOperationRequest`; the service method is `X(x float64, p Precision)`; the
-  handler method binds its own request type (like `h.sqrt`); the `operations` row in
+  handler method binds a one-operand request type (like `h.sqrt`): reuse `sqrtRequest` if
+  the body is the same, or add a new type to `request.go` **and append it to
+  `requestTypes` in `bind_test.go`**, otherwise `TestValidationTagsHaveCodes` and
+  `TestRequestFieldsAreNumbers` silently skip it; on the frontend, add the operation to
+  `UNARY_OPERATIONS` (`frontend/src/api/operations.ts`); the `operations` row in
   `TestOperationServiceErrors` needs a one-operand `body`; and if the operand needs a rule
   beyond "a number" (e.g. whole numbers only), add it to the field's `binding` tag (a new
   custom rule is registered in `newValidator` and mapped in `validationTagCodes`).

@@ -33,7 +33,9 @@ const (
 // field errors (api/openapi.yaml ValidationErrorResponse).
 const CodeValidationFailed Code = "error.validation.failed"
 
-// Field-level codes: the "code" of an entry in a validation error's "errors".
+// Field-level codes: the "code" of an entry in a validation error response,
+// which is a bare array of {"field", "code"} (api/openapi.yaml
+// ValidationErrorResponse).
 const (
 	CodeFieldRequired    Code = "error.field.required"
 	CodeFieldInvalidType Code = "error.field.invalid.type"
