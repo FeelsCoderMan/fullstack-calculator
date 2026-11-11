@@ -163,7 +163,9 @@ and the reasoning behind each operation are in [`docs/operations.md`](docs/opera
 
 1. Describe it in `api/openapi.yaml`: path, request body, and every response status with
    its schema.
-2. Implement the handler and register the route in `internal/handler/routes.go`.
+2. Add its request type to `internal/handler/request.go` (with `binding` rules), implement
+   the handler method, and register the route in `registerHandlers`
+   (`internal/handler/calculator.go`).
 3. Test it with `httptest`, and call `assertMatchesSpec(t, req, rec)` on each response.
    `TestRoutesMatchSpec` fails if the router and the spec disagree.
 
@@ -261,7 +263,8 @@ backend/
 ├── internal/
 │   ├── apperror/        # error codes, sentinels, Internal/Validation/Panic, stack capture
 │   ├── server/          # App: loads config, sets up logging, listens, graceful shutdown
-│   ├── handler/         # HTTP layer (gin): routes, request decoding/validation, handlers, access-log middleware
+│   ├── handler/         # HTTP layer (gin): routes, request structs + validation, handlers, error responses
+│   ├── middleware/      # RequestLogger: one log record per request, request ID, panic recovery
 │   ├── service/         # business logic: Calculator (the operations), result checks, rounding
 │   ├── config/          # env loading: config.LoadServer, config.LoadLog
 │   └── logger/          # slog setup, categories, typed attributes, dev file output

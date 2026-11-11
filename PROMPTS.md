@@ -522,3 +522,14 @@ separately:
 **78.** Confirming the scope commit:
 
 > yes, commit it
+
+## Session 5 (continued): root README
+
+**79.**
+
+> add a README.md for project root. It should explain how to build both frontend and backend
+> at once. Currently, both parts have their own README.md to build it one by one.
+
+**80.** Confirming the README commit:
+
+> yes, commit it
