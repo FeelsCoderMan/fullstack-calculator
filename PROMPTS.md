@@ -668,3 +668,13 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **108.** Confirming the commit and push of the assumptions section:
 
 > yes
+
+**109.**
+
+> the boxes of decimal places and first number should have same width so they will be
+> aligned. Currently on desktop view, width of decimal places is bigger than first number.
+> Apply the fix
+
+**110.** Confirming the commit and push of the alignment fix:
+
+> yes

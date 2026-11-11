@@ -10,6 +10,12 @@
 }
 
 .form {
+  /* One column template for the operand row and the footer, so the decimal places
+     select lines up with the first number exactly: same columns, same gap. */
+  --operator-width: 2.5rem;
+  --operand-columns: minmax(0, 1fr) var(--operator-width) minmax(0, 1fr);
+  --operand-gap: var(--space-3);
+
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -20,11 +26,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: var(--space-3);
+  gap: var(--operand-gap);
 }
 
 .binary {
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: var(--operand-columns);
 }
 
 .symbol {
@@ -32,7 +38,7 @@
   align-self: end;
   display: grid;
   place-items: center;
-  min-width: 2.5rem;
+  width: var(--operator-width);
   height: var(--tap-target);
   font-size: var(--font-size-xl);
   font-weight: 600;
@@ -47,23 +53,26 @@
   margin-top: calc(var(--font-size-sm) * var(--line-height-body) + var(--space-1));
 }
 
+/* Desktop: the precision select in the first number's column, the buttons at the
+   end of the row, across the operator and second-number columns. */
 .footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
+  display: grid;
+  grid-template-columns: var(--operand-columns);
+  align-items: end;
+  column-gap: var(--operand-gap);
+  row-gap: var(--space-4);
 }
 
 .precision {
-  flex: 1 1 14rem;
-  max-width: 20rem;
+  grid-column: 1;
+  min-width: 0;
 }
 
 .actions {
+  grid-column: 2 / -1;
+  justify-self: end;
   display: flex;
   gap: var(--space-3);
-  margin-left: auto;
 }
 
 .button {
@@ -138,24 +147,21 @@
   .symbol,
   .operands:has([aria-invalid='true']) .symbol {
     align-self: center;
+    /* Stacked: span the row so the operator stays centred between the inputs. */
+    width: auto;
     height: 1.75rem;
     margin-top: 0;
   }
 
   .footer {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .precision {
-    flex-basis: auto;
-    max-width: none;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Primary action first and largest, where the thumb is. */
   .actions {
+    grid-column: 1;
+    justify-self: stretch;
     flex-direction: column-reverse;
-    margin-left: 0;
   }
 
   .button {
