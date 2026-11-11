@@ -44,6 +44,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/multiply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Multiply two numbers
+         * @description Returns `leftOperand * rightOperand`, optionally rounded to `precision`
+         *     decimal places. Products reach the float64 limits more easily than sums:
+         *     `1e155 * 1e155` overflows (422 `error.calculation.result.overflow`), and
+         *     two non-zero operands can underflow to `0` (`1e-200 * 1e-200`), which is
+         *     accepted. Products of integers above 2^53 are not exact.
+         */
+        post: operations["multiply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/divide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Divide two numbers
+         * @description Returns `leftOperand / rightOperand`, optionally rounded to `precision`
+         *     decimal places. A `rightOperand` of `0` (or `-0`, or a value that
+         *     underflows to `0` such as `1e-400`) is
+         *     422 `error.calculation.division.by.zero`, checked before dividing, so
+         *     `0 / 0` is division by zero too. A tiny non-zero divisor can overflow
+         *     (`1 / 5e-324`, 422 `error.calculation.result.overflow`), and a quotient
+         *     can underflow to `0` (`1e-300 / 1e300`), which is accepted.
+         */
+        post: operations["divide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/power": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Raise a number to a power
+         * @description Returns `leftOperand` raised to the power `rightOperand`
+         *     (`leftOperand ^ rightOperand`), optionally rounded to `precision`
+         *     decimal places.
+         *     - Base `0` (or `-0`) with a negative exponent is `1 / 0`:
+         *       422 `error.calculation.zero.negative.power`, checked before computing.
+         *     - `x ^ 0` is `1` for every `x`, including `0 ^ 0` (IEEE 754, as in
+         *       JavaScript's `Math.pow`).
+         *     - A negative base with a fractional exponent has no real result
+         *       (`(-8) ^ 0.5`, and `(-8) ^ (1/3)` because `1/3` isn't exact in
+         *       float64): 422 `error.calculation.result.undefined`.
+         *     - Integer exponents (below 2^64 in magnitude) are computed exactly and
+         *       rounded once, so `10 ^ 308` is exactly `1e308` and
+         *       `1.0000000001 ^ 1e10` is `2.7182820532347876`; fractional exponents
+         *       can be off in the last digit.
+         *     - Results reach the float64 limits quickly: `10 ^ 309` and
+         *       `(-10) ^ 309` overflow (422 `error.calculation.result.overflow`),
+         *       `10 ^ -400` underflows to `0` (accepted).
+         */
+        post: operations["power"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/percentage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Percentage of a number
+         * @description Returns `leftOperand` percent of `rightOperand`, that is
+         *     `leftOperand * rightOperand / 100`, optionally rounded to `precision`
+         *     decimal places (`15` percent of `19.99` is `2.9985`).
+         *     - Computed exactly and rounded once: no intermediate step can overflow
+         *       or underflow on its own (`1e307` percent of `50` is `5e306`, and
+         *       `100` percent of the largest float64 is that float64), and typical
+         *       inputs give the expected decimal (`7` percent of `100` is `7`).
+         *     - Only a result beyond about ±1.797e308 is 422
+         *       `error.calculation.result.overflow` (`200` percent of the largest
+         *       float64); a result below about 2.5e-324 underflows to `0`, accepted.
+         *     - Negative percentages and negative bases are allowed (`-20` percent
+         *       of `50` is `-10`).
+         */
+        post: operations["percentage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sqrt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Square root of a number
+         * @description Returns the square root of `operand`, optionally rounded to `precision`
+         *     decimal places.
+         *     - `operand` is any number ≥ 0, whole or decimal (`1.5` gives
+         *       `1.224744871391589`, `2.25` gives `1.5`).
+         *     - A negative `operand` (`-4`, `-2.5`, `-1e-320`) is
+         *       422 `error.calculation.negative.square.root`, checked before
+         *       computing.
+         *     - `0` and `-0` give `0`; an operand that underflows to `0` on input
+         *       (`1e-400`, `-1e-400`) gives `0`.
+         *     - Before any `precision` rounding, the result is exactly rounded
+         *       (IEEE 754) and can neither overflow nor underflow: the square root of
+         *       the largest float64 is `1.3407807929942596e154`, and of the smallest
+         *       positive float64 (`5e-324`) it is `2.2227587494850775e-162`. Integers above 2^53 are read inexactly
+         *       (`9007199254740993` is `9007199254740992`).
+         */
+        post: operations["sqrt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -81,14 +231,18 @@ export interface components {
          *     - `error.request.method.not.allowed` (405): wrong HTTP method
          *     - `error.request.body.too.large` (413): body exceeds 1 MiB
          *     - `error.request.unsupported.media.type` (415): `Content-Type` is not `application/json`
-         *     - `error.calculation.division.by.zero` (422): `divide` with `b == 0`
-         *     - `error.calculation.negative.square.root` (422): `sqrt` with `a < 0`
+         *     - `error.calculation.division.by.zero` (422): `divide` with `rightOperand` equal to 0
+         *       (or `-0`, or a value that underflows to 0 such as `1e-400`)
+         *     - `error.calculation.zero.negative.power` (422): `power` with `leftOperand` 0 (or `-0`)
+         *       and a negative `rightOperand`, i.e. `1 / 0`
+         *     - `error.calculation.negative.square.root` (422): `sqrt` with a negative `operand`
          *     - `error.calculation.result.overflow` (422): the result is infinite
          *     - `error.calculation.result.undefined` (422): the result is not a number
+         *       (e.g. `power` with a negative base and a fractional exponent)
          *     - `error.internal` (500): unexpected failure
          * @enum {string}
          */
-        ErrorCode: "error.request.invalid.json" | "error.request.not.found" | "error.request.method.not.allowed" | "error.request.body.too.large" | "error.request.unsupported.media.type" | "error.calculation.division.by.zero" | "error.calculation.negative.square.root" | "error.calculation.result.overflow" | "error.calculation.result.undefined" | "error.internal";
+        ErrorCode: "error.request.invalid.json" | "error.request.not.found" | "error.request.method.not.allowed" | "error.request.body.too.large" | "error.request.unsupported.media.type" | "error.calculation.division.by.zero" | "error.calculation.zero.negative.power" | "error.calculation.negative.square.root" | "error.calculation.result.overflow" | "error.calculation.result.undefined" | "error.internal";
         /**
          * @description Problem with a single request field.
          *     - `error.field.required`: missing or `null`
@@ -117,6 +271,26 @@ export interface components {
             leftOperand: number;
             /** @example 2 */
             rightOperand: number;
+            /**
+             * @description Decimal places to round the result to. Omit it (or send `null`) for
+             *     the full float64 result.
+             * @example 2
+             */
+            precision?: number | null;
+        };
+        /**
+         * @description Operand of a one-operand operation (`sqrt`). Every invalid field is
+         *     reported at once (`ValidationErrorResponse`), in the order `operand`,
+         *     `precision`, then unknown properties alphabetically.
+         */
+        UnaryOperationRequest: {
+            /**
+             * @description Any number in the float64 range; the math needs a number ≥ 0.
+             *     Negative values pass validation and fail with
+             *     `error.calculation.negative.square.root`.
+             * @example 1.5
+             */
+            operand: number;
             /**
              * @description Decimal places to round the result to. Omit it (or send `null`) for
              *     the full float64 result.
@@ -221,8 +395,12 @@ export interface components {
          *     - one or more fields are invalid: a bare array with one entry per
          *       invalid field (`ValidationErrorResponse`), or
          *     - the fields are valid but the math is not: `ErrorResponse` with
-         *       `error.calculation.result.overflow` (result beyond ±1.797e308) or
-         *       `error.calculation.result.undefined` (result is not a number).
+         *       `error.calculation.result.overflow` (result beyond ±1.797e308),
+         *       `error.calculation.result.undefined` (result is not a number), or
+         *       an operation-specific code: `error.calculation.division.by.zero`
+         *       (`divide` only), `error.calculation.zero.negative.power`
+         *       (`power` only) or `error.calculation.negative.square.root` (`sqrt`
+         *       only).
          */
         Unprocessable: {
             headers: {
@@ -302,6 +480,140 @@ export interface operations {
                  *     }
                  */
                 "application/json": components["schemas"]["BinaryOperationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Result"];
+            400: components["responses"]["InvalidJSON"];
+            413: components["responses"]["BodyTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    multiply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "leftOperand": 2.5,
+                 *       "rightOperand": 4
+                 *     }
+                 */
+                "application/json": components["schemas"]["BinaryOperationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Result"];
+            400: components["responses"]["InvalidJSON"];
+            413: components["responses"]["BodyTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    divide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "leftOperand": 10,
+                 *       "rightOperand": 4
+                 *     }
+                 */
+                "application/json": components["schemas"]["BinaryOperationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Result"];
+            400: components["responses"]["InvalidJSON"];
+            413: components["responses"]["BodyTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    power: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "leftOperand": 2,
+                 *       "rightOperand": 10
+                 *     }
+                 */
+                "application/json": components["schemas"]["BinaryOperationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Result"];
+            400: components["responses"]["InvalidJSON"];
+            413: components["responses"]["BodyTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    percentage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "leftOperand": 15,
+                 *       "rightOperand": 19.99
+                 *     }
+                 */
+                "application/json": components["schemas"]["BinaryOperationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Result"];
+            400: components["responses"]["InvalidJSON"];
+            413: components["responses"]["BodyTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sqrt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "operand": 1.5
+                 *     }
+                 */
+                "application/json": components["schemas"]["UnaryOperationRequest"];
             };
         };
         responses: {

@@ -93,11 +93,12 @@ export const en = {
   } satisfies Record<Operation, OperationText>,
   errors: {
     [ErrorCode.InvalidJSON]: 'The request could not be read. Please try again.',
-    [ErrorCode.NotFound]: 'This operation is not available on the server yet.',
+    [ErrorCode.NotFound]: 'The server doesn’t support this request. Try reloading the page.',
     [ErrorCode.MethodNotAllowed]: 'The server does not accept this request.',
     [ErrorCode.BodyTooLarge]: 'The numbers are too long to send.',
     [ErrorCode.UnsupportedMediaType]: 'The server could not understand the request format.',
     [ErrorCode.DivisionByZero]: 'You can’t divide by zero.',
+    [ErrorCode.ZeroNegativePower]: 'Zero can’t be raised to a negative power: that divides by zero.',
     [ErrorCode.NegativeSquareRoot]: 'A negative number has no real square root.',
     [ErrorCode.ResultOverflow]: 'The result is too large to represent.',
     [ErrorCode.ResultUndefined]: 'The result is not a real number.',

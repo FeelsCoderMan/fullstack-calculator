@@ -5,7 +5,12 @@ import { errorMessage, fieldErrorMessage, formatNumber, operationText } from './
 describe('errorMessage', () => {
   const cases = [
     { name: 'math error', code: 'error.calculation.division.by.zero', want: 'You can’t divide by zero.' },
-    { name: 'missing route', code: 'error.request.not.found', want: 'This operation is not available on the server yet.' },
+    {
+      name: 'zero to a negative power',
+      code: 'error.calculation.zero.negative.power',
+      want: 'Zero can’t be raised to a negative power: that divides by zero.',
+    },
+    { name: 'missing route', code: 'error.request.not.found', want: 'The server doesn’t support this request. Try reloading the page.' },
     { name: 'client-side network failure', code: 'error.client.network', want: 'Can’t reach the server. Check your connection and try again.' },
     { name: 'field code reported for the whole form', code: 'error.field.unknown', want: 'The server did not expect this value.' },
     { name: 'unknown code falls back', code: 'error.something.new', want: 'Something went wrong. Please try again.' },

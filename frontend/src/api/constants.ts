@@ -46,6 +46,7 @@ export const ErrorCode = {
   BodyTooLarge: 'error.request.body.too.large',
   UnsupportedMediaType: 'error.request.unsupported.media.type',
   DivisionByZero: 'error.calculation.division.by.zero',
+  ZeroNegativePower: 'error.calculation.zero.negative.power',
   NegativeSquareRoot: 'error.calculation.negative.square.root',
   ResultOverflow: 'error.calculation.result.overflow',
   ResultUndefined: 'error.calculation.result.undefined',

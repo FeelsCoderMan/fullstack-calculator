@@ -87,6 +87,44 @@ describe('Calculator', () => {
     expect(screen.getByLabelText('Number')).toHaveFocus()
   })
 
+  it('takes the square root of a decimal', async () => {
+    calculateMock.mockResolvedValue({ kind: 'success', result: 1.5 })
+    const { user, display } = setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Square root' }))
+    await user.type(screen.getByLabelText('Number'), '2.25=')
+
+    await waitFor(() => expect(display).toHaveTextContent('√2.25 =1.5'))
+    expect(calculateMock).toHaveBeenCalledWith('sqrt', { operand: 2.25 }, expect.any(AbortSignal))
+  })
+
+  it('carries a decimal result into square root', async () => {
+    calculateMock
+      .mockResolvedValueOnce({ kind: 'success', result: 2.25 })
+      .mockResolvedValueOnce({ kind: 'success', result: 1.5 })
+    const { user, display } = setup()
+
+    await user.type(screen.getByLabelText('First number'), '2')
+    await user.type(screen.getByLabelText('Second number'), '0.25=')
+    await waitFor(() => expect(display).toHaveTextContent('2 + 0.25 =2.25'))
+    await user.click(screen.getByRole('radio', { name: 'Square root' }))
+    await user.click(screen.getByRole('button', { name: 'Calculate' }))
+
+    await waitFor(() => expect(display).toHaveTextContent('√2.25 =1.5'))
+    expect(calculateMock).toHaveBeenLastCalledWith('sqrt', { operand: 2.25 }, expect.any(AbortSignal))
+  })
+
+  it('leaves a negative square root to the server', async () => {
+    calculateMock.mockResolvedValue({ kind: 'failure', code: 'error.calculation.negative.square.root', requestId: 'R1' })
+    const { user, display } = setup()
+
+    await user.click(screen.getByRole('radio', { name: 'Square root' }))
+    await user.type(screen.getByLabelText('Number'), '-4=')
+
+    await waitFor(() => expect(display).toHaveTextContent('A negative number has no real square root.'))
+    expect(calculateMock).toHaveBeenCalledWith('sqrt', { operand: -4 }, expect.any(AbortSignal))
+  })
+
   it('keeps the inputs when the calculation fails', async () => {
     calculateMock.mockResolvedValue({ kind: 'failure', code: 'error.calculation.division.by.zero', requestId: 'R1' })
     const { user, display } = setup()
@@ -184,14 +222,24 @@ describe('Calculator', () => {
       want: 'You can’t divide by zero.',
     },
     {
+      name: 'zero to a negative power',
+      outcome: { kind: 'failure', code: 'error.calculation.zero.negative.power', requestId: 'R1' },
+      want: 'Zero can’t be raised to a negative power: that divides by zero.',
+    },
+    {
+      name: 'negative square root',
+      outcome: { kind: 'failure', code: 'error.calculation.negative.square.root', requestId: 'R1' },
+      want: 'A negative number has no real square root.',
+    },
+    {
       name: 'overflow',
       outcome: { kind: 'failure', code: 'error.calculation.result.overflow', requestId: 'R1' },
       want: 'The result is too large to represent.',
     },
     {
-      name: 'operation not on the server yet',
+      name: 'unknown route',
       outcome: { kind: 'failure', code: 'error.request.not.found', requestId: 'R1' },
-      want: 'This operation is not available on the server yet.',
+      want: 'The server doesn’t support this request. Try reloading the page.',
     },
     {
       name: 'network failure',

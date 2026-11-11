@@ -4,11 +4,8 @@ A single-page React + TypeScript app, built with [Vite](https://vite.dev), for t
 calculator. It sends every calculation to the Go backend and shows the result, or an error
 explained in plain language. There is no router: the whole app is one page.
 
-> **Status:** the UI offers all seven operations: add, subtract, multiply, divide, power,
-> square root and percentage. The backend implements only `add` and `subtract` so far. The
-> others answer `404 error.request.not.found`, and the UI shows *"This operation is not
-> available on the server yet."* They start working as soon as the backend adds their
-> endpoints. The frontend needs no change for that.
+It covers all seven operations of the backend: add, subtract, multiply, divide, power,
+square root and percentage. Results can be chained like on a pocket calculator.
 
 ## Requirements
 
@@ -124,19 +121,32 @@ Every operation is one `POST`:
 POST /api/v1/add        {"leftOperand": 1.5, "rightOperand": 2}                  → 200 {"result": 3.5}
 POST /api/v1/divide     {"leftOperand": 1, "rightOperand": 3, "precision": 2}    → 200 {"result": 0.33}
 POST /api/v1/divide     {"leftOperand": 1, "rightOperand": 0}                    → 422 {"code": "error.calculation.division.by.zero"}
+POST /api/v1/sqrt       {"operand": 2.25}                                        → 200 {"result": 1.5}
+POST /api/v1/power      {"leftOperand": 0, "rightOperand": -1}                   → 422 {"code": "error.calculation.zero.negative.power"}
 POST /api/v1/subtract   {"rightOperand": "x"}                                    → 422 [{"field":"leftOperand","code":"error.field.required"},
                                                                                         {"field":"rightOperand","code":"error.field.invalid.type"}]
 ```
 
-| Operation   | Path                  | Inputs in the UI         |
-|-------------|-----------------------|--------------------------|
-| Add         | `/api/v1/add`         | first + second number    |
-| Subtract    | `/api/v1/subtract`    | number − subtract        |
-| Multiply    | `/api/v1/multiply`    | first × second number    |
-| Divide      | `/api/v1/divide`      | dividend ÷ divisor       |
-| Power       | `/api/v1/power`       | base ^ exponent          |
-| Square root | `/api/v1/sqrt`        | one number               |
-| Percentage  | `/api/v1/percentage`  | percent *of* a number    |
+| Operation   | Path                  | Body                            | Inputs in the UI          | Math errors (422)                    |
+|-------------|-----------------------|---------------------------------|---------------------------|--------------------------------------|
+| Add         | `/api/v1/add`         | `leftOperand`, `rightOperand`   | first + second number     | `result.overflow`                    |
+| Subtract    | `/api/v1/subtract`    | `leftOperand`, `rightOperand`   | number − amount           | `result.overflow`                    |
+| Multiply    | `/api/v1/multiply`    | `leftOperand`, `rightOperand`   | first × second number     | `result.overflow`                    |
+| Divide      | `/api/v1/divide`      | `leftOperand`, `rightOperand`   | dividend ÷ divisor        | `division.by.zero`, `result.overflow` |
+| Power       | `/api/v1/power`       | `leftOperand`, `rightOperand`   | base ^ exponent           | `zero.negative.power`, `result.overflow`, `result.undefined` |
+| Square root | `/api/v1/sqrt`        | `operand`                       | one number                | `negative.square.root`               |
+| Percentage  | `/api/v1/percentage`  | `leftOperand`, `rightOperand`   | percent *of* a number     | `result.overflow`                    |
+
+Math error codes are listed without their `error.calculation.` prefix. Each one has its own
+message in `src/i18n/en.ts`, e.g. `0 ^ -1` shows *"Zero can’t be raised to a negative power:
+that divides by zero."*
+The authoritative list per operation is in the spec and in Swagger UI.
+
+**Square root takes one operand.** Its body is `{"operand", "precision"?}`
+(`UnaryOperationRequest` in the spec). `operand` is any number, decimals included (`2.25` →
+`1.5`), so a decimal result can carry straight into a square root. The client doesn't reject
+negative numbers: they are valid input, and the backend answers
+`error.calculation.negative.square.root`, shown as *"A negative number has no real square root."*
 
 ### Continuing from a result
 
@@ -158,12 +168,6 @@ typing `=` in a number field, also calculates. The carried value is the exact re
 Every operation also takes an optional **Decimal places** setting (`precision`, 0–15). Left on
 *Full precision*, the field is not sent and the backend returns the full float64 result
 (e.g. `0.1 + 0.2 = 0.30000000000000004`).
-
-> **Square root is provisional.** The backend hasn't designed its request yet. Until it does,
-> the frontend sends `{"operand": 9, "precision"?: n}`. That shape lives in one place,
-> `UnaryOperationRequest` in `src/api/types.ts`, and `buildRequest` / `inputForField` in
-> `src/api/operations.ts`. When the spec defines sqrt, run `npm run gen:api` and switch to
-> the generated type.
 
 ### Errors
 
@@ -241,7 +245,7 @@ frontend/
 ├── src/
 │   ├── api/
 │   │   ├── schema.gen.ts     # generated from the OpenAPI spec (npm run gen:api), committed
-│   │   ├── types.ts          # aliases for the generated types (+ provisional sqrt request)
+│   │   ├── types.ts          # aliases for the generated types
 │   │   ├── constants.ts      # operations, paths, field names, error codes, headers
 │   │   ├── operations.ts     # arity, inputs per operation, request building, field mapping
 │   │   └── client.ts         # calculate(): fetch + response classification
