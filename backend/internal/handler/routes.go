@@ -1,5 +1,6 @@
-// Package handler is the HTTP layer: routing, request decoding, and response
-// writing. It is the only package that depends on gin.
+// Package handler is the HTTP layer: routing, request binding and validation,
+// and response writing. Together with middleware, it is the only package that
+// depends on gin.
 package handler
 
 import (

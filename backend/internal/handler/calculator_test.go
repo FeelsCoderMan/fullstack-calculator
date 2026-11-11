@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -1365,8 +1364,6 @@ func (f fakeCalculator) Sqrt(float64, service.Precision) (float64, error) {
 	return 0, f.err
 }
 
-var errDiskOnFire = errors.New("disk on fire")
-
 // TestOperationServiceErrors checks how every operation route answers the
 // errors its Calculator method returns.
 func TestOperationServiceErrors(t *testing.T) {
@@ -1384,7 +1381,7 @@ func TestOperationServiceErrors(t *testing.T) {
 		},
 		{
 			name:       "internal failure reveals only the internal code",
-			err:        apperror.Internal(errDiskOnFire),
+			err:        apperror.Internal(errUnexpected),
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   `{"code":"error.internal"}`,
 		},
@@ -1396,7 +1393,7 @@ func TestOperationServiceErrors(t *testing.T) {
 		},
 		{
 			name:       "plain error is internal",
-			err:        errDiskOnFire,
+			err:        errUnexpected,
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   `{"code":"error.internal"}`,
 		},
