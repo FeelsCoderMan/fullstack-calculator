@@ -40,7 +40,9 @@ make up     # builds both images, starts backend, then frontend; returns once bo
 
 `make up` runs `docker compose up --build --detach --wait`: Compose builds both images,
 starts the backend, waits until its `/health` check passes, then starts the frontend. It
-prints the URLs when the stack is ready. `make help` lists every target.
+prints the URLs when the stack is ready (`make urls` prints them again). The ports in
+those URLs are read from the running stack, so `ports:` in `docker-compose.yml` is the only
+place they are defined. `make help` lists every target.
 
 Without Make, the same with plain Compose (in the foreground):
 

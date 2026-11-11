@@ -1,14 +1,16 @@
 # Runs the whole stack (backend + frontend) with the root docker-compose.yml.
 # Per-part tooling lives in backend/Makefile (Go) and frontend/package.json (npm).
-.PHONY: help env up down restart build logs logs-backend logs-frontend ps
+.PHONY: help env up down restart build urls logs logs-backend logs-frontend ps
 
 COMPOSE := docker compose -f docker-compose.yml
 ENV_FILE := backend/.env
 ENV_EXAMPLE := backend/.env.example
 
-# The app and the backend, as published by docker-compose.yml.
-FRONTEND_URL := http://localhost:3000
-BACKEND_URL := http://localhost:8080
+# URL of a running service, from the host port Compose actually published for it
+# (the `ports:` mapping in docker-compose.yml), so the Makefile never repeats it:
+# $(call service_url,frontend) -> http://localhost:3000. Expanded by the shell
+# when the recipe runs, after the stack is up.
+service_url = http://localhost:$$($(COMPOSE) ps --format '{{(index .Publishers 0).PublishedPort}}' $(1))
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{ printf "  make %-14s %s\n", $$1, $$2 }'
@@ -19,7 +21,7 @@ env: ## Create backend/.env from the example (never overwrites an existing one)
 
 up: $(ENV_FILE) ## Build both images and start the stack; returns once both are healthy
 	$(COMPOSE) up --build --detach --wait
-	@echo "calculator: $(FRONTEND_URL)   API docs: $(FRONTEND_URL)/swagger/   backend: $(BACKEND_URL)"
+	@$(MAKE) --no-print-directory urls
 
 down: ## Stop and remove the containers and network
 	$(COMPOSE) down
@@ -32,6 +34,13 @@ restart: $(ENV_FILE) ## Recreate the stack from scratch
 
 build: $(ENV_FILE) ## Build both images without starting them
 	$(COMPOSE) build
+
+urls: ## Print the URLs of the running stack (ports read from Compose)
+	@if [ -z "$$($(COMPOSE) ps --quiet --status running frontend)" ]; then \
+		echo "the stack is not running; start it with: make up" >&2; exit 1; fi
+	@echo "calculator: $(call service_url,frontend)"
+	@echo "API docs:   $(call service_url,frontend)/swagger/"
+	@echo "backend:    $(call service_url,backend)"
 
 logs: ## Follow the logs of both services (Ctrl+C stops following, not the stack)
 	$(COMPOSE) logs --follow

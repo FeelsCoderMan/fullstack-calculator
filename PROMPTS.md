@@ -624,3 +624,12 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **99.** Confirming the Makefile commit:
 
 > yes, commit it
+
+**100.**
+
+> in makefile do not use hardcoded variables, frontend url and backend url should be used
+> from dockerfiles.
+
+**101.** Confirming the Makefile URL commit:
+
+> yes, commit it
