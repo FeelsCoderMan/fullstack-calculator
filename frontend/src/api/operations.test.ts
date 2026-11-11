@@ -1,64 +1,54 @@
 import { describe, expect, it } from 'vitest'
 import { Operation } from '@/api/constants'
-import { buildRequest, inputForField, inputsOf } from '@/api/operations'
+import { buildRequest, isBinary, type Operands } from '@/api/operations'
+import type { OperationRequest } from '@/api/types'
 
-describe('inputsOf', () => {
+describe('isBinary', () => {
   const cases = [
-    { name: 'two-operand operation', operation: Operation.Divide, want: ['leftOperand', 'rightOperand', 'precision'] },
-    { name: 'square root takes one operand', operation: Operation.Sqrt, want: ['leftOperand', 'precision'] },
+    { name: 'add', operation: Operation.Add, want: true },
+    { name: 'subtract', operation: Operation.Subtract, want: true },
+    { name: 'multiply', operation: Operation.Multiply, want: true },
+    { name: 'divide', operation: Operation.Divide, want: true },
+    { name: 'power', operation: Operation.Power, want: true },
+    { name: 'percentage', operation: Operation.Percentage, want: true },
+    { name: 'square root takes one operand', operation: Operation.Sqrt, want: false },
   ] as const
 
   it.each(cases)('$name', ({ operation, want }) => {
-    expect(inputsOf(operation)).toEqual(want)
+    expect(isBinary(operation)).toBe(want)
   })
 })
 
 describe('buildRequest', () => {
-  const cases = [
+  const cases: { name: string; operands: Operands; want: OperationRequest }[] = [
     {
       name: 'two operands without precision',
-      operation: Operation.Add,
-      operands: { left: 1.5, right: 2, precision: null },
+      operands: { binary: true, operation: Operation.Add, left: 1.5, right: 2, precision: null },
       want: { leftOperand: 1.5, rightOperand: 2 },
     },
     {
       name: 'two operands with precision',
-      operation: Operation.Percentage,
-      operands: { left: 20, right: 50, precision: 2 },
+      operands: { binary: true, operation: Operation.Percentage, left: 20, right: 50, precision: 2 },
       want: { leftOperand: 20, rightOperand: 50, precision: 2 },
     },
     {
       name: 'precision zero is sent',
-      operation: Operation.Divide,
-      operands: { left: 1, right: 3, precision: 0 },
+      operands: { binary: true, operation: Operation.Divide, left: 1, right: 3, precision: 0 },
       want: { leftOperand: 1, rightOperand: 3, precision: 0 },
     },
     {
       name: 'square root sends a single operand',
-      operation: Operation.Sqrt,
-      operands: { left: 9, right: Number.NaN, precision: 3 },
+      operands: { binary: false, operation: Operation.Sqrt, left: 9, precision: 3 },
       want: { operand: 9, precision: 3 },
     },
-  ] as const
+    {
+      name: 'square root without precision',
+      operands: { binary: false, operation: Operation.Sqrt, left: 2.25, precision: null },
+      want: { operand: 2.25 },
+    },
+  ]
 
-  it.each(cases)('$name', ({ operation, operands, want }) => {
-    expect(buildRequest(operation, operands)).toEqual(want)
-  })
-})
-
-describe('inputForField', () => {
-  const cases = [
-    { name: 'left operand', operation: Operation.Add, field: 'leftOperand', want: 'leftOperand' },
-    { name: 'right operand', operation: Operation.Add, field: 'rightOperand', want: 'rightOperand' },
-    { name: 'precision', operation: Operation.Add, field: 'precision', want: 'precision' },
-    { name: 'unknown property', operation: Operation.Add, field: 'zzz', want: undefined },
-    { name: 'binary operation has no operand field', operation: Operation.Add, field: 'operand', want: undefined },
-    { name: 'square root operand maps to the left input', operation: Operation.Sqrt, field: 'operand', want: 'leftOperand' },
-    { name: 'square root precision', operation: Operation.Sqrt, field: 'precision', want: 'precision' },
-    { name: 'square root has no right operand', operation: Operation.Sqrt, field: 'rightOperand', want: undefined },
-  ] as const
-
-  it.each(cases)('$name', ({ operation, field, want }) => {
-    expect(inputForField(operation, field)).toBe(want)
+  it.each(cases)('$name', ({ operands, want }) => {
+    expect(buildRequest(operands)).toEqual(want)
   })
 })

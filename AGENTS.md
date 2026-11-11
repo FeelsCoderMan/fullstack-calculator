@@ -124,6 +124,7 @@ Each package keeps its declarations in two dedicated files, the same way a domai
         ├── api/              # typed API client + generated OpenAPI types
         ├── i18n/             # code → message mapping (success + error texts)
         ├── components/       # one folder per component: calculator/Calculator.tsx + Calculator.module.css (+ test)
+        ├── form/             # pure form logic: inputs, validation, operands, API field-error mapping, status
         ├── hooks/            # stateful logic (e.g. useCalculator)
         └── utils/            # validation helpers
 ```

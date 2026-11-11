@@ -1,18 +1,38 @@
 import { ClientErrorCode, ErrorCode, FieldErrorCode, Operation, PRECISION_MAX, PRECISION_MIN } from '@/api/constants'
+import type { UnaryOperation } from '@/api/operations'
 import type { ErrorCode as ApiErrorCode, FieldErrorCode as ApiFieldErrorCode } from '@/api/types'
 
-/** How an operation is presented: its name, symbol, input labels and written-out expression. */
-export interface OperationText {
+/** How an operation is presented: its name, symbol and the label of its (first) input. */
+interface BaseOperationText {
   name: string
   symbol: string
   leftLabel: string
-  /** Absent for one-operand operations. */
-  rightLabel?: string
+}
+
+/** Texts of a two-operand operation. */
+export interface BinaryOperationText extends BaseOperationText {
+  rightLabel: string
+  /** The calculation as a person would write it, e.g. `3 + 4`. Operands are already formatted. */
+  expression: (left: string, right: string) => string
+}
+
+/** Texts of a one-operand operation: no second input, no second operand. */
+export interface UnaryOperationText extends BaseOperationText {
   /**
-   * The calculation as a person would write it, e.g. `3 + 4`. Operands are already
-   * formatted; `right` is absent for one-operand operations.
+   * The calculation as a person would write it, e.g. `√9`. The operand is already
+   * formatted. `right?: never` makes a two-argument call on an operation that may be
+   * unary a compile error: narrow with `isBinary` first.
    */
-  expression: (left: string, right?: string) => string
+  expression: (operand: string, right?: never) => string
+}
+
+/**
+ * The texts each operation must have, by arity (`UNARY_OPERATIONS` in
+ * `src/api/operations.ts`): a two-operand operation without `rightLabel` is a
+ * compile error.
+ */
+export type OperationTexts = {
+  [O in Operation]: O extends UnaryOperation ? UnaryOperationText : BinaryOperationText
 }
 
 /** English texts. Every user-facing string in the app comes from here. */
@@ -81,7 +101,7 @@ export const en = {
       name: 'Square root',
       symbol: '√',
       leftLabel: 'Number',
-      expression: (l) => `√${l}`,
+      expression: (operand) => `√${operand}`,
     },
     [Operation.Percentage]: {
       name: 'Percentage',
@@ -90,7 +110,7 @@ export const en = {
       rightLabel: 'Of',
       expression: (l, r) => `${l}% of ${r}`,
     },
-  } satisfies Record<Operation, OperationText>,
+  } satisfies OperationTexts,
   errors: {
     [ErrorCode.InvalidJSON]: 'The request could not be read. Please try again.',
     [ErrorCode.NotFound]: 'The server doesn’t support this request. Try reloading the page.',

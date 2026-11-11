@@ -1,9 +1,12 @@
 import { useRef, type FormEvent, type KeyboardEvent } from 'react'
 import { PRECISION_MAX, PRECISION_MIN } from '@/api/constants'
-import { Arity, arityOf, InputField } from '@/api/operations'
-import { StatusKind, useCalculator } from '@/hooks/useCalculator'
+import { isBinary } from '@/api/operations'
+import { InputField } from '@/form/form'
+import { StatusKind } from '@/form/status'
+import { useCalculator } from '@/hooks/useCalculator'
 import { operationText, t } from '@/i18n'
 import { cx } from '@/utils/dom'
+import { FULL_PRECISION } from '@/utils/validation'
 import styles from '@/components/calculator/Calculator.module.css'
 import { Field } from '@/components/field/Field'
 import { OperationPicker } from '@/components/operation-picker/OperationPicker'
@@ -11,9 +14,6 @@ import { ResultDisplay } from '@/components/result-display/ResultDisplay'
 
 /** `KeyboardEvent.key` of the "=" key. */
 const EQUALS_KEY = '='
-
-/** Select value meaning "no rounding": `precision` is left out of the request. */
-const FULL_PRECISION = ''
 
 const PRECISION_OPTIONS = Array.from({ length: PRECISION_MAX - PRECISION_MIN + 1 }, (_, i) => PRECISION_MIN + i)
 
@@ -24,7 +24,8 @@ export function Calculator() {
   const { operation, values, fieldErrors, status, setOperation, setValue, reset, submit } = useCalculator()
   const controls = useRef<Partial<Record<InputField, Control | null>>>({})
   const text = operationText(operation)
-  const binary = arityOf(operation) === Arity.Binary
+  // The second input's label, or null when the operation takes one operand.
+  const rightLabel = isBinary(operation) ? operationText(operation).rightLabel : null
   const loading = status.kind === StatusKind.Loading
 
   const bind = (input: InputField) => (element: Control | null) => {
@@ -77,14 +78,14 @@ export function Calculator() {
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <OperationPicker value={operation} onChange={setOperation} />
 
-        <div className={cx(styles.operands, binary && styles.binary)}>
+        <div className={cx(styles.operands, rightLabel !== null && styles.binary)}>
           {operandField(InputField.Left, text.leftLabel)}
-          {binary && (
+          {rightLabel !== null && (
             <>
               <span className={styles.symbol} aria-hidden="true">
                 {text.symbol}
               </span>
-              {operandField(InputField.Right, text.rightLabel ?? text.leftLabel)}
+              {operandField(InputField.Right, rightLabel)}
             </>
           )}
         </div>

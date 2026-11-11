@@ -9,6 +9,9 @@ import type { FieldErrorCode as FieldErrorCodeValue } from '@/api/types'
 const NUMBER_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i
 const INTEGER_PATTERN = /^[+-]?\d+$/
 
+/** Precision input value meaning "no rounding": `precision` is left out of the request. */
+export const FULL_PRECISION = ''
+
 /**
  * Validates an operand typed by the user with the same field codes the backend uses.
  * Returns `null` when the input is a valid number.
@@ -42,7 +45,7 @@ export function formatOperand(value: number): string {
  */
 export function validatePrecision(raw: string): FieldErrorCodeValue | null {
   const input = raw.trim()
-  if (input === '') return null
+  if (input === FULL_PRECISION) return null
   if (!INTEGER_PATTERN.test(input)) return FieldErrorCode.InvalidType
   const places = Number(input)
   if (places < PRECISION_MIN || places > PRECISION_MAX) return FieldErrorCode.OutOfRange
@@ -52,5 +55,5 @@ export function validatePrecision(raw: string): FieldErrorCodeValue | null {
 /** Parses a precision that passed `validatePrecision`; `null` = full precision. */
 export function parsePrecision(raw: string): number | null {
   const input = raw.trim()
-  return input === '' ? null : Number(input)
+  return input === FULL_PRECISION ? null : Number(input)
 }

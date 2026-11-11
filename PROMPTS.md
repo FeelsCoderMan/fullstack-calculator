@@ -579,3 +579,11 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **88.** Confirming the two fix commits (B3+B5, then F1+F9):
 
 > yes, commit them separately
+
+**89.** Picking findings from the quality-reviewer's frontend table to fix:
+
+> fix F2, F3, F4, F5, F6, F7
+
+**90.** Confirming the F2–F7 commit:
+
+> yes, commit it

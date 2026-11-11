@@ -35,19 +35,26 @@ describe('fieldErrorMessage', () => {
   })
 })
 
-describe('operation expression', () => {
+describe('two-operand expression', () => {
   const cases = [
     { name: 'add', operation: Operation.Add, left: '3', right: '4', want: '3 + 4' },
     { name: 'subtract', operation: Operation.Subtract, left: '3', right: '4', want: '3 − 4' },
     { name: 'multiply', operation: Operation.Multiply, left: '3', right: '4', want: '3 × 4' },
     { name: 'divide', operation: Operation.Divide, left: '3', right: '4', want: '3 ÷ 4' },
     { name: 'power', operation: Operation.Power, left: '2', right: '10', want: '2 ^ 10' },
-    { name: 'square root', operation: Operation.Sqrt, left: '9', right: undefined, want: '√9' },
     { name: 'percentage', operation: Operation.Percentage, left: '20', right: '50', want: '20% of 50' },
   ] as const
 
   it.each(cases)('$name', ({ operation, left, right, want }) => {
     expect(operationText(operation).expression(left, right)).toBe(want)
+  })
+})
+
+describe('one-operand expression', () => {
+  const cases = [{ name: 'square root', operation: Operation.Sqrt, operand: '9', want: '√9' }] as const
+
+  it.each(cases)('$name', ({ operation, operand, want }) => {
+    expect(operationText(operation).expression(operand)).toBe(want)
   })
 })
 

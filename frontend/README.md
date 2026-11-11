@@ -256,10 +256,13 @@ frontend/
 │   │   ├── schema.gen.ts     # generated from the OpenAPI spec (npm run gen:api), committed
 │   │   ├── types.ts          # aliases for the generated types
 │   │   ├── constants.ts      # operations, paths, field names, error codes, headers
-│   │   ├── operations.ts     # arity, inputs per operation, request building, field mapping
+│   │   ├── operations.ts     # arity (UNARY_OPERATIONS, isBinary), Operands, request building
 │   │   └── client.ts         # calculate(): fetch + response classification
 │   ├── i18n/                 # every user-facing text, code → message lookups
-│   ├── hooks/useCalculator.ts # form state, validation, request lifecycle, result carry-over
+│   ├── form/
+│   │   ├── form.ts           # inputs per operation, validateForm, toOperands, mapApiFieldErrors (pure, unit-tested)
+│   │   └── status.ts         # what the display shows: idle, loading, success, failure
+│   ├── hooks/useCalculator.ts # React state + request lifecycle: abort, result carry-over, focus target
 │   ├── components/           # one folder per component: the .tsx, its CSS Module and its test
 │   │   ├── calculator/       # Calculator.tsx, Calculator.module.css, Calculator.test.tsx
 │   │   ├── field/            # Field.tsx, Field.module.css

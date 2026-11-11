@@ -1,55 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { calculate, type CalculationOutcome, failure, isAbortError, OutcomeKind } from '@/api/client'
 import { ClientErrorCode, Operation } from '@/api/constants'
-import { Arity, arityOf, buildRequest, InputField, inputForField, inputsOf, type Operands } from '@/api/operations'
-import { formatOperand, parseOperand, parsePrecision, validateOperand, validatePrecision } from '@/utils/validation'
-
-/** Raw text of each input, exactly as typed. */
-export type FormValues = Record<InputField, string>
-
-/** Field error code per input; an input without an entry is valid. */
-export type FieldErrors = Partial<Record<InputField, string>>
-
-export const StatusKind = {
-  Idle: 'idle',
-  Loading: 'loading',
-  Success: 'success',
-  Failure: 'failure',
-} as const
-
-export type Status =
-  | { kind: typeof StatusKind.Idle }
-  | { kind: typeof StatusKind.Loading }
-  | { kind: typeof StatusKind.Success; operation: Operation; operands: Operands; result: number }
-  | { kind: typeof StatusKind.Failure; code: string; requestId: string | null }
-
-const EMPTY_VALUES: FormValues = {
-  [InputField.Left]: '',
-  [InputField.Right]: '',
-  [InputField.Precision]: '',
-}
-
-const IDLE: Status = { kind: StatusKind.Idle }
-
-/** Client-side validation of the inputs `operation` uses, with the backend's field codes. */
-export function validateForm(operation: Operation, values: FormValues): FieldErrors {
-  const errors: FieldErrors = {}
-  for (const input of inputsOf(operation)) {
-    const code = input === InputField.Precision ? validatePrecision(values[input]) : validateOperand(values[input])
-    if (code !== null) errors[input] = code
-  }
-  return errors
-}
-
-function toOperands(operation: Operation, values: FormValues): Operands {
-  const usesRight = inputsOf(operation).includes(InputField.Right)
-  return {
-    left: parseOperand(values[InputField.Left]),
-    // A one-operand operation ignores the right input, so it isn't parsed.
-    right: usesRight ? parseOperand(values[InputField.Right]) : Number.NaN,
-    precision: parsePrecision(values[InputField.Precision]),
-  }
-}
+import { buildRequest } from '@/api/operations'
+import {
+  EMPTY_VALUES,
+  type FieldErrors,
+  firstInvalidInput,
+  type FormValues,
+  InputField,
+  mapApiFieldErrors,
+  toOperands,
+  validateForm,
+} from '@/form/form'
+import { IDLE, type Status, StatusKind } from '@/form/status'
+import { formatOperand } from '@/utils/validation'
 
 /**
  * State and actions of the calculator form: the selected operation, the typed
@@ -134,7 +98,7 @@ export function useCalculator() {
 
     let outcome: CalculationOutcome
     try {
-      outcome = await calculate(operation, buildRequest(operation, operands), controller.signal)
+      outcome = await calculate(operation, buildRequest(operands), controller.signal)
     } catch (err) {
       if (isAbortError(err)) return null
       outcome = failure(ClientErrorCode.UnexpectedResponse, null)
@@ -145,7 +109,7 @@ export function useCalculator() {
     switch (outcome.kind) {
       case OutcomeKind.Success: {
         const { result } = outcome
-        setStatus({ kind: StatusKind.Success, operation, operands, result })
+        setStatus({ kind: StatusKind.Success, operands, result })
         // Carry the result into the first number and clear the second, ready for the
         // next operand. Precision stays as chosen.
         setValues((prev) => ({
@@ -153,19 +117,12 @@ export function useCalculator() {
           [InputField.Left]: formatOperand(result),
           [InputField.Right]: EMPTY_VALUES[InputField.Right],
         }))
-        return arityOf(operation) === Arity.Binary ? InputField.Right : InputField.Left
+        return operands.binary ? InputField.Right : InputField.Left
       }
       case OutcomeKind.FieldErrors: {
-        const apiErrors: FieldErrors = {}
-        let unmatched: string | null = null
-        for (const { field, code } of outcome.errors) {
-          const input = inputForField(operation, field)
-          if (input === undefined) unmatched ??= code
-          else apiErrors[input] ??= code
-        }
+        const { fieldErrors: apiErrors, unmatched } = mapApiFieldErrors(operation, outcome.errors)
         setFieldErrors(apiErrors)
-        // An error for a field the form doesn't show (e.g. error.field.unknown) can
-        // only be reported for the whole form.
+        // A field the form doesn't show can only be reported for the whole form.
         setStatus(
           unmatched === null ? IDLE : { kind: StatusKind.Failure, code: unmatched, requestId: outcome.requestId },
         )
@@ -178,9 +135,4 @@ export function useCalculator() {
   }, [cancel, leaveLoading, operation, values])
 
   return { operation, values, fieldErrors, status, setOperation, setValue, reset, submit }
-}
-
-/** The first input in form order that has an error, or `null`. */
-function firstInvalidInput(operation: Operation, errors: FieldErrors): InputField | null {
-  return inputsOf(operation).find((input) => errors[input] !== undefined) ?? null
 }

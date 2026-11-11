@@ -1,10 +1,14 @@
 import type { Operation } from '@/api/constants'
-import { en, type OperationText } from '@/i18n/en'
+import { en, type OperationTexts } from '@/i18n/en'
 
 /** The active messages. Only English exists; a second locale would be chosen here. */
 export const t = en
 
-export function operationText(operation: Operation): OperationText {
+/**
+ * Texts of an operation. The return type follows the operation's arity: narrow a
+ * plain `Operation` with `isBinary` to get `rightLabel` and the two-operand `expression`.
+ */
+export function operationText<O extends Operation>(operation: O): OperationTexts[O] {
   return t.operations[operation]
 }
 

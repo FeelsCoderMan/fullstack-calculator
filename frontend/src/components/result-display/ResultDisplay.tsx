@@ -1,6 +1,6 @@
 import { useId } from 'react'
-import { arityOf, Arity } from '@/api/operations'
-import { StatusKind, type Status } from '@/hooks/useCalculator'
+import type { Operands } from '@/api/operations'
+import { StatusKind, type Status } from '@/form/status'
 import { errorMessage, formatNumber, operationText, t } from '@/i18n'
 import styles from '@/components/result-display/ResultDisplay.module.css'
 
@@ -41,12 +41,11 @@ function StatusContent({ status }: ResultDisplayProps) {
         </span>
       )
     case StatusKind.Success: {
-      const { operation, operands, result } = status
-      const right = arityOf(operation) === Arity.Binary ? formatNumber(operands.right) : undefined
+      const { operands, result } = status
       return (
         <>
           <span className={styles.expression}>
-            {operationText(operation).expression(formatNumber(operands.left), right)} {t.result.equals}
+            {expressionOf(operands)} {t.result.equals}
           </span>
           <span className={styles.value}>{formatNumber(result)}</span>
         </>
@@ -61,4 +60,12 @@ function StatusContent({ status }: ResultDisplayProps) {
         </>
       )
   }
+}
+
+/** The finished calculation as a person would write it, e.g. `3 + 4` or `√9`. */
+function expressionOf(operands: Operands): string {
+  const left = formatNumber(operands.left)
+  return operands.binary
+    ? operationText(operands.operation).expression(left, formatNumber(operands.right))
+    : operationText(operands.operation).expression(left)
 }
