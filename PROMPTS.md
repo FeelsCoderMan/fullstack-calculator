@@ -633,3 +633,14 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **101.** Confirming the Makefile URL commit:
 
 > yes, commit it
+
+## Session 5 (continued): publishing
+
+**102.**
+
+> remote add https://github.com/FeelsCoderMan/fullstack-calculator.git and push the changes
+> to main
+
+**103.** Recording the push prompt itself:
+
+> yes, add it and push
