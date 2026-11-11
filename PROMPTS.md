@@ -615,3 +615,12 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **97.** Confirming the two commits (B2+B3 docs, then B1):
 
 > yes, commit them separately
+
+**98.**
+
+> introduce a Makefile in project root to use docker compose. It should use docker compose
+> file to run both backend and frontend servers at once
+
+**99.** Confirming the Makefile commit:
+
+> yes, commit it

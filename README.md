@@ -23,6 +23,7 @@ To run the app you only need Docker:
 |----------------|--------------------------------------------------|
 | Docker Engine  | 23+ (BuildKit on by default)                     |
 | Docker Compose | v2.24+ (for `env_file.required` and `up --wait`) |
+| GNU Make       | any (optional: the `make` shortcuts; plain `docker compose` works too) |
 
 To run the tests and coverage reports on your machine, you also need
 [Go](https://go.dev/dl/) **1.27.4+** (backend) and [Node.js](https://nodejs.org) **22.12+**
@@ -30,16 +31,23 @@ with npm 10+ (frontend).
 
 ## Quick start: build and run everything
 
-From the project root:
+From the project root, with the root `Makefile`:
 
 ```sh
-cp backend/.env.example backend/.env   # once: the backend has no defaults and won't start without it
-docker compose up --build              # builds both images, starts backend, then frontend
+make env    # once: creates backend/.env from the example (the backend has no defaults)
+make up     # builds both images, starts backend, then frontend; returns once both are healthy
 ```
 
-Compose builds both images, starts the backend, waits until its `/health` check passes, and
-then starts the frontend. Add `--detach --wait` to run it in the background and return once
-both are healthy.
+`make up` runs `docker compose up --build --detach --wait`: Compose builds both images,
+starts the backend, waits until its `/health` check passes, then starts the frontend. It
+prints the URLs when the stack is ready. `make help` lists every target.
+
+Without Make, the same with plain Compose (in the foreground):
+
+```sh
+cp backend/.env.example backend/.env
+docker compose up --build
+```
 
 | URL                                | What                                            |
 |------------------------------------|-------------------------------------------------|
@@ -48,13 +56,15 @@ both are healthy.
 | <http://localhost:8080>            | the backend directly (e.g. `/health`, `/api/v1/...`) |
 
 ```sh
-docker compose ps          # both services should say (healthy)
-docker compose logs -f     # follow the logs of both (backend logs are JSON lines)
-docker compose down        # stop and remove everything
+make ps              # both services should say (healthy)
+make logs            # follow the logs of both (backend logs are JSON lines)
+make logs-backend    # or one service: logs-backend, logs-frontend
+make down            # stop and remove everything
+make restart         # down + up
 ```
 
-After a code change in either part, run `docker compose up --build` again. It rebuilds what
-changed and recreates the containers.
+After a code change in either part, run `make up` again. It rebuilds what changed and
+recreates the containers.
 
 ### Check that it works
 
@@ -119,6 +129,7 @@ All agreed conventions and decisions are in [`AGENTS.md`](AGENTS.md).
 
 ```
 .
+├── Makefile             # make up / down / logs / ps: the whole stack through docker compose
 ├── docker-compose.yml   # runs backend + frontend together
 ├── backend/             # Go service: API, OpenAPI spec, Swagger UI  → backend/README.md
 ├── frontend/            # React + Vite app, served by nginx in Docker → frontend/README.md
