@@ -559,3 +559,19 @@ like `@/src/api/client`) or to `frontend/src` (`@/api/client`, the usual convent
 **85.** Confirming the component-folders commit:
 
 > yes, commit it
+
+## Session 5 (continued): quality review
+
+**86.**
+
+> introduce a subagent that is responsible for reviewing the fullstack application with code
+> quality and maintainability metrics. It could be DRY, separation of concerns, coupling. For
+> frontend, component/state design, accessibility and non-duplicate UI. Its job is to give a
+> table that cite the file or relevant function. Its columns should mention severity
+> (critical, high, medium or low), suggestions and it should not refactor anything before
+> deciding each concern/risk how it should be handled. After it is created, run it for both
+> backend and frontend parts to see if we are violating these rules.
+
+**87.** After reviewing the audit tables:
+
+> yes, commit the agent, then fix B3, B5, F1, F9

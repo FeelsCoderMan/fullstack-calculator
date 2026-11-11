@@ -532,6 +532,12 @@ npm run build
 3. **Review before finishing a step.** Use the `code-reviewer` subagent
    (`.claude/agents/code-reviewer.md`). It is read-only, so apply its findings yourself and
    note which ones you skipped and why.
+   For a code quality and maintainability audit (DRY, separation of concerns, coupling;
+   frontend component/state design, accessibility, duplicated UI), use the
+   `quality-reviewer` subagent (`.claude/agents/quality-reviewer.md`). It returns a table of
+   findings (severity `critical`/`high`/`medium`/`low`, location, suggestion, proposed
+   handling) and never refactors: the project owner decides how each finding is handled
+   (fix now, fix later, accept) before any change is made.
 4. A contract change (endpoint, field, error code) updates `openapi.yaml`, the `apperror`
    catalog above, the handlers, the tests, the frontend mapping, and the README in the same change.
 5. Record AI prompts used for the work in `PROMPTS.md`.
